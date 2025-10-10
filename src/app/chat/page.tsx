@@ -25,7 +25,7 @@ import {
   Info,
   Plus,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type ToolCallPart = { type: "tool-call"; toolName: string; args?: unknown };
 type ToolResultPart = {
@@ -164,8 +164,22 @@ export default function Chat() {
   const [teachingPrompt, setTeachingPrompt] = useState("");
   const [isTeachingMode, setIsTeachingMode] = useState(false);
   const [useStructuredOutput, setUseStructuredOutput] = useState(false);
-  const [selectedModel, setSelectedModel] = useState("openai/gpt-4o-mini");
+  const [selectedModel, setSelectedModelState] = useState<string>("");
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Wrap setSelectedModel to prevent empty values
+  const setSelectedModel = useCallback(
+    (value: string | ((prev: string) => string)) => {
+      const newValue =
+        typeof value === "function" ? value(selectedModel) : value;
+      if (!newValue || !newValue.trim()) {
+        return;
+      }
+      setSelectedModelState(newValue);
+    },
+    [selectedModel]
+  );
 
   // Build API URL with current parameters
   const apiUrl = useMemo(() => {
@@ -182,6 +196,9 @@ export default function Chat() {
     transport: new DefaultChatTransport({
       api: apiUrl,
     }),
+    onError: (error) => {
+      console.error("Chat error:", error);
+    },
   });
 
   // Samples state
@@ -446,6 +463,85 @@ export default function Chat() {
     }
   }
 
+  // Load preferences on mount - this runs FIRST before anything else
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/preferences", { cache: "no-store" });
+        if (res.ok) {
+          const prefs = (await res.json()) as {
+            selectedModel?: string;
+            isTeachingMode?: boolean;
+            useStructuredOutput?: boolean;
+          };
+
+          // Set preferences immediately with state setters directly
+          if (prefs.selectedModel && prefs.selectedModel.trim()) {
+            setSelectedModelState(prefs.selectedModel);
+
+            // Ensure the model is in the textModels list
+            setTextModels((prev) => {
+              const modelExists = prev.some(
+                (m) => m.id === prefs.selectedModel
+              );
+              if (!modelExists && prefs.selectedModel) {
+                return [
+                  {
+                    id: prefs.selectedModel,
+                    name: prefs.selectedModel,
+                    description: "From preferences",
+                    modelType: "language",
+                  },
+                  ...prev,
+                ];
+              }
+              return prev;
+            });
+          } else {
+            // Fallback to default if no preference
+            setSelectedModelState("openai/gpt-4o-mini");
+          }
+
+          if (typeof prefs.isTeachingMode === "boolean")
+            setIsTeachingMode(prefs.isTeachingMode);
+          if (typeof prefs.useStructuredOutput === "boolean")
+            setUseStructuredOutput(prefs.useStructuredOutput);
+        } else {
+          // API failed, use default
+          setSelectedModelState("openai/gpt-4o-mini");
+        }
+      } catch (error) {
+        console.error("Failed to load preferences:", error);
+        // On error, use default
+        setSelectedModelState("openai/gpt-4o-mini");
+      } finally {
+        setPreferencesLoaded(true);
+      }
+    })();
+  }, []);
+
+  // Save preferences when they change
+  useEffect(() => {
+    if (!preferencesLoaded) return;
+    if (!selectedModel || !selectedModel.trim()) return;
+
+    (async () => {
+      try {
+        await fetch("/api/preferences", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            selectedModel,
+            isTeachingMode,
+            useStructuredOutput,
+          }),
+        });
+      } catch (error) {
+        console.error("Error saving preferences:", error);
+      }
+    })();
+  }, [selectedModel, isTeachingMode, useStructuredOutput, preferencesLoaded]);
+
   useEffect(() => {
     loadSamples();
     (async () => {
@@ -499,18 +595,17 @@ export default function Chat() {
               ? data.textModels
               : (data.models || []).filter((m) => m.modelType === "language")
           ) as GatewayModel[];
-          setTextModels(list);
+          setTextModels((prev) => {
+            // If we already have a model from preferences, keep it
+            const prevModels = prev.filter(
+              (pm) => !list.some((m) => m.id === pm.id)
+            );
+            return [...prevModels, ...list];
+          });
         }
       } catch {}
     })();
   }, []);
-
-  useEffect(() => {
-    if (messages.length) {
-      const last = messages[messages.length - 1];
-      console.log("Last message parts:", last.parts);
-    }
-  }, [messages]);
 
   const pendingPairComplete = useMemo(
     () => !!pendingQuestion && !!pendingAnswer,
@@ -962,24 +1057,30 @@ export default function Chat() {
                 )}
               </Button>
             </div>
-            <Select value={selectedModel} onValueChange={setSelectedModel}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Select model" />
-              </SelectTrigger>
-              <SelectContent>
-                {textModels.length > 0 ? (
-                  textModels.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.name}
+            {preferencesLoaded && selectedModel ? (
+              <Select value={selectedModel} onValueChange={setSelectedModel}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Select model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {textModels.length > 0 ? (
+                    textModels.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value={selectedModel}>
+                      {selectedModel} (loading...)
                     </SelectItem>
-                  ))
-                ) : (
-                  <SelectItem value="openai/gpt-4o-mini">
-                    GPT-4o Mini (loading...)
-                  </SelectItem>
-                )}
-              </SelectContent>
-            </Select>
+                  )}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="w-[200px] h-10 flex items-center justify-center border rounded-md text-sm text-muted-foreground">
+                Loading...
+              </div>
+            )}
           </form>
         </div>
 

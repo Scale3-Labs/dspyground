@@ -1,0 +1,87 @@
+import fs from "fs/promises";
+import { NextResponse } from "next/server";
+import path from "path";
+
+const PREFERENCES_FILE = path.join(process.cwd(), "data", "preferences.json");
+
+type Preferences = {
+  selectedModel: string;
+  isTeachingMode: boolean;
+  useStructuredOutput: boolean;
+};
+
+const DEFAULT_PREFERENCES: Preferences = {
+  selectedModel: "openai/gpt-4.1-mini",
+  isTeachingMode: false,
+  useStructuredOutput: false,
+};
+
+// GET: Read preferences
+export async function GET() {
+  try {
+    const data = await fs.readFile(PREFERENCES_FILE, "utf8");
+    const preferences = JSON.parse(data) as Preferences;
+    return NextResponse.json(preferences);
+  } catch (error) {
+    // If file doesn't exist or is invalid, return defaults and create the file
+    console.error("Error reading preferences:", error);
+    try {
+      await fs.writeFile(
+        PREFERENCES_FILE,
+        JSON.stringify(DEFAULT_PREFERENCES, null, 2),
+        "utf8"
+      );
+    } catch (writeError) {
+      console.error("Error writing default preferences:", writeError);
+    }
+    return NextResponse.json(DEFAULT_PREFERENCES);
+  }
+}
+
+// POST: Update preferences
+export async function POST(request: Request) {
+  try {
+    const body = (await request.json()) as Partial<Preferences>;
+
+    // Validate selectedModel if provided
+    if (
+      "selectedModel" in body &&
+      (!body.selectedModel || !body.selectedModel.trim())
+    ) {
+      return NextResponse.json(
+        { error: "selectedModel cannot be empty" },
+        { status: 400 }
+      );
+    }
+
+    // Read current preferences
+    let currentPreferences: Preferences;
+    try {
+      const data = await fs.readFile(PREFERENCES_FILE, "utf8");
+      currentPreferences = JSON.parse(data) as Preferences;
+    } catch {
+      currentPreferences = DEFAULT_PREFERENCES;
+    }
+
+    // Merge with new preferences
+    const updatedPreferences: Preferences = {
+      ...currentPreferences,
+      ...body,
+    };
+
+    // Write updated preferences
+    await fs.writeFile(
+      PREFERENCES_FILE,
+      JSON.stringify(updatedPreferences, null, 2),
+      "utf8"
+    );
+
+    return NextResponse.json(updatedPreferences);
+  } catch (error) {
+    console.error("Error updating preferences:", error);
+    return NextResponse.json(
+      { error: "Failed to update preferences" },
+      { status: 500 }
+    );
+  }
+}
