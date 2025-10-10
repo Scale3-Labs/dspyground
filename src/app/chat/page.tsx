@@ -17,7 +17,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { ChevronLeft, ChevronRight, Info, Plus } from "lucide-react";
+import {
+  ArrowUp,
+  ChevronLeft,
+  ChevronRight,
+  Circle,
+  Info,
+  Plus,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 type ToolCallPart = { type: "tool-call"; toolName: string; args?: unknown };
@@ -157,6 +164,8 @@ export default function Chat() {
   const [teachingPrompt, setTeachingPrompt] = useState("");
   const [isTeachingMode, setIsTeachingMode] = useState(false);
   const [useStructuredOutput, setUseStructuredOutput] = useState(false);
+  const [selectedModel, setSelectedModel] = useState("openai/gpt-4o-mini");
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Build API URL with current parameters
   const apiUrl = useMemo(() => {
@@ -164,8 +173,9 @@ export default function Chat() {
     if (useStructuredOutput) params.set("structured", "true");
     if (isTeachingMode && teachingPrompt.trim())
       params.set("teachingPrompt", teachingPrompt.trim());
+    if (selectedModel) params.set("model", selectedModel);
     return params.toString() ? `/api/chat?${params.toString()}` : "/api/chat";
-  }, [useStructuredOutput, isTeachingMode, teachingPrompt]);
+  }, [useStructuredOutput, isTeachingMode, teachingPrompt, selectedModel]);
 
   const { messages, sendMessage, setMessages } = useChat({
     id: `chat-${useStructuredOutput ? "structured" : "text"}`, // Force recreation when mode changes
@@ -862,9 +872,19 @@ export default function Chat() {
           <form
             onSubmit={async (e) => {
               e.preventDefault();
+              if (isSending) {
+                // Cancel generation
+                if (abortControllerRef.current) {
+                  abortControllerRef.current.abort();
+                  abortControllerRef.current = null;
+                }
+                setIsSending(false);
+                return;
+              }
               if (!input.trim() && !(isTeachingMode && teachingPrompt.trim()))
                 return;
               setIsSending(true);
+              abortControllerRef.current = new AbortController();
               try {
                 // Ensure a system message when teaching mode is active
                 if (isTeachingMode && teachingPrompt.trim()) {
@@ -909,21 +929,57 @@ export default function Chat() {
                     },
                   ],
                 });
+              } catch (error) {
+                if ((error as Error).name !== "AbortError") {
+                  console.error("Send error:", error);
+                }
               } finally {
                 setIsSending(false);
+                abortControllerRef.current = null;
               }
               setInput("");
             }}
             className="flex gap-2 bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75 border-t pt-3"
           >
-            <Input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Type your message..."
-            />
-            <Button type="submit" disabled={isSending}>
-              {isSending ? "Sending..." : "Send"}
-            </Button>
+            <div className="relative flex-1">
+              <Input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Type your message..."
+                className="pr-12"
+              />
+              <Button
+                type="submit"
+                size="icon"
+                variant={isSending ? "destructive" : "default"}
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 rounded-md"
+                aria-label={isSending ? "Cancel" : "Send"}
+              >
+                {isSending ? (
+                  <Circle className="h-4 w-4" />
+                ) : (
+                  <ArrowUp className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+            <Select value={selectedModel} onValueChange={setSelectedModel}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Select model" />
+              </SelectTrigger>
+              <SelectContent>
+                {textModels.length > 0 ? (
+                  textModels.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.name}
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="openai/gpt-4o-mini">
+                    GPT-4o Mini (loading...)
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
           </form>
         </div>
 

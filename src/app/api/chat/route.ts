@@ -71,12 +71,14 @@ export async function POST(req: Request) {
   const teachingSystemPrompt =
     url.searchParams.get("teachingPrompt") || undefined;
   const useStructuredOutput = url.searchParams.get("structured") === "true";
+  const modelId = url.searchParams.get("model") || "openai/gpt-4o-mini";
 
   console.log("🎓 Teaching mode:", teachingSystemPrompt ? "ACTIVE" : "OFF");
   if (teachingSystemPrompt) {
     console.log("🎓 Teaching prompt:", teachingSystemPrompt);
   }
   console.log("📊 Structured output:", useStructuredOutput ? "ACTIVE" : "OFF");
+  console.log("🤖 Model:", modelId);
 
   // Read dynamic system prompt from data/prompt.md (optimized by MiPRO) unless teaching override is present
   let baseSystemPrompt: string | undefined;
@@ -153,7 +155,7 @@ export async function POST(req: Request) {
 
     try {
       const objectResult = streamObject({
-        model: "openai/gpt-4o-mini",
+        model: modelId,
         schema: jsonSchema(schema),
         system: systemPrompt,
         messages: convertToModelMessages(messages),
@@ -169,7 +171,7 @@ export async function POST(req: Request) {
 
       // Wrap the JSON in a streamText response so useChat can handle it
       const textResult = streamText({
-        model: "openai/gpt-4o-mini",
+        model: modelId,
         prompt: `Return exactly this JSON without any modification:\n\n${finalJson}`,
         temperature: 0,
       });
@@ -192,7 +194,7 @@ export async function POST(req: Request) {
 
   // Otherwise use regular streamText
   const result = streamText({
-    model: "openai/gpt-4o-mini", // Changed from gpt-4.1-mini
+    model: modelId,
     tools: availableTools,
     system: systemPrompt,
     messages: convertToModelMessages(messages),
