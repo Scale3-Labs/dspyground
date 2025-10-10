@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -155,9 +156,22 @@ export default function Chat() {
   const [isSending, setIsSending] = useState(false);
   const [teachingPrompt, setTeachingPrompt] = useState("");
   const [isTeachingMode, setIsTeachingMode] = useState(false);
+  const [useStructuredOutput, setUseStructuredOutput] = useState(false);
+
+  // Build API URL with current parameters
+  const apiUrl = useMemo(() => {
+    const params = new URLSearchParams();
+    if (useStructuredOutput) params.set("structured", "true");
+    if (isTeachingMode && teachingPrompt.trim())
+      params.set("teachingPrompt", teachingPrompt.trim());
+    return params.toString() ? `/api/chat?${params.toString()}` : "/api/chat";
+  }, [useStructuredOutput, isTeachingMode, teachingPrompt]);
 
   const { messages, sendMessage, setMessages } = useChat({
-    transport: new DefaultChatTransport({ api: "/api/chat" }),
+    id: `chat-${useStructuredOutput ? "structured" : "text"}`, // Force recreation when mode changes
+    transport: new DefaultChatTransport({
+      api: apiUrl,
+    }),
   });
 
   // Samples state
@@ -593,6 +607,16 @@ export default function Chat() {
               <ThemeToggle />
             </div>
             <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 px-3 py-1.5 border rounded-md bg-background">
+                <span className="text-xs text-muted-foreground">Text</span>
+                <Switch
+                  checked={useStructuredOutput}
+                  onCheckedChange={setUseStructuredOutput}
+                />
+                <span className="text-xs text-muted-foreground">
+                  Structured
+                </span>
+              </div>
               <Button
                 variant={isTeachingMode ? "default" : "outline"}
                 size="sm"
@@ -661,6 +685,19 @@ export default function Chat() {
             </div>
           )}
 
+          {useStructuredOutput && (
+            <div className="border rounded-md p-3 bg-purple-50 dark:bg-purple-950/30 dark:border-purple-900/40">
+              <div className="flex items-center gap-2">
+                <div className="text-sm font-medium">
+                  Structured Output Mode
+                </div>
+                <div className="text-xs text-purple-700 dark:text-purple-300">
+                  Responses will match the schema defined in data/schema.json
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex-1 border rounded-md p-4 space-y-3 overflow-y-auto dark:border-neutral-800">
             {messages.map((m) =>
               m.role === "system" ? null : (
@@ -680,6 +717,43 @@ export default function Chat() {
                   {(m.parts || []).map((part, index) => {
                     if (part.type === "text") {
                       const text = (part as { text?: string }).text ?? "";
+
+                      // Debug log for structured mode
+                      if (useStructuredOutput && m.role === "assistant") {
+                        console.log(
+                          "Received text in structured mode:",
+                          text.substring(0, 100)
+                        );
+                      }
+
+                      // Try to parse as JSON if it looks like structured output
+                      if (
+                        text.trim().startsWith("{") ||
+                        text.trim().startsWith("[")
+                      ) {
+                        try {
+                          const parsed = JSON.parse(text);
+                          return (
+                            <div key={index} className="mt-2">
+                              <div className="text-[10px] bg-purple-50 text-purple-700 border border-purple-200 rounded px-1.5 py-0.5 inline-block mb-1">
+                                Structured Output
+                              </div>
+                              <pre className="text-xs whitespace-pre-wrap break-words text-neutral-700 bg-neutral-50 border border-neutral-200 rounded p-3 dark:text-neutral-200 dark:bg-neutral-900 dark:border-neutral-800">
+                                {JSON.stringify(parsed, null, 2)}
+                              </pre>
+                            </div>
+                          );
+                        } catch (e) {
+                          // Not valid JSON, display as regular text
+                          console.log(
+                            "Failed to parse JSON:",
+                            e,
+                            "Text:",
+                            text.substring(0, 100)
+                          );
+                        }
+                      }
+
                       return <span key={index}>{text}</span>;
                     }
 

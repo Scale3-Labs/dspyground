@@ -1,7 +1,9 @@
 import * as availableTools from "@/lib/tools";
 import {
   convertToModelMessages,
+  jsonSchema,
   stepCountIs,
+  streamObject,
   streamText,
   type UIMessage,
 } from "ai";
@@ -64,24 +66,23 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
 
-  // Check for teaching prompt in URL parameters
+  // Check for parameters in URL
   const url = new URL(req.url);
   const teachingSystemPrompt =
     url.searchParams.get("teachingPrompt") || undefined;
+  const useStructuredOutput = url.searchParams.get("structured") === "true";
 
   console.log("🎓 Teaching mode:", teachingSystemPrompt ? "ACTIVE" : "OFF");
   if (teachingSystemPrompt) {
     console.log("🎓 Teaching prompt:", teachingSystemPrompt);
   }
+  console.log("📊 Structured output:", useStructuredOutput ? "ACTIVE" : "OFF");
 
   // Read dynamic system prompt from data/prompt.md (optimized by MiPRO) unless teaching override is present
   let baseSystemPrompt: string | undefined;
   if (!teachingSystemPrompt) {
     try {
-      const version = url.searchParams.get("version") || undefined;
-      const promptPath = version
-        ? path.join(process.cwd(), "data", "versions", version, "prompt.md")
-        : path.join(process.cwd(), "data", "prompt.md");
+      const promptPath = path.join(process.cwd(), "data", "prompt.md");
       const promptContent = await fs.readFile(promptPath, "utf8");
       baseSystemPrompt = promptContent?.trim() ? promptContent : undefined;
     } catch {
@@ -90,9 +91,7 @@ export async function POST(req: Request) {
   }
 
   // Load optimized configuration from MiPRO results
-  const optimizedConfig = await loadOptimizedConfig(
-    url.searchParams.get("version") || undefined
-  );
+  const optimizedConfig = await loadOptimizedConfig(undefined);
 
   // Prefer an explicit system message provided by the client
   const firstSystemMessage = (messages || []).find((m) => m.role === "system");
@@ -127,8 +126,73 @@ export async function POST(req: Request) {
     `📚 Including ${optimizedConfig.demos?.length || 0} optimized demos`
   );
 
+  // If structured output is requested, use streamObject
+  if (useStructuredOutput) {
+    // Load schema from data/schema.json
+    let schema;
+    try {
+      const schemaPath = path.join(process.cwd(), "data", "schema.json");
+      const schemaContent = await fs.readFile(schemaPath, "utf8");
+      schema = JSON.parse(schemaContent);
+      console.log("📋 Loaded schema from data/schema.json");
+    } catch (error) {
+      console.error("Failed to load schema:", error);
+      return new Response(
+        JSON.stringify({
+          error:
+            "Schema not found. Please create a schema.json file in the data folder.",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    console.log("🚀 Starting streamObject...");
+
+    try {
+      const objectResult = streamObject({
+        model: "openai/gpt-4o-mini",
+        schema: jsonSchema(schema),
+        system: systemPrompt,
+        messages: convertToModelMessages(messages),
+        temperature: optimizedConfig.temperature || 0.7,
+      });
+
+      // Collect the final object from the stream
+      let finalObject;
+      for await (const partialObject of objectResult.partialObjectStream) {
+        finalObject = partialObject;
+      }
+      const finalJson = JSON.stringify(finalObject, null, 2);
+
+      // Wrap the JSON in a streamText response so useChat can handle it
+      const textResult = streamText({
+        model: "openai/gpt-4o-mini",
+        prompt: `Return exactly this JSON without any modification:\n\n${finalJson}`,
+        temperature: 0,
+      });
+
+      return textResult.toUIMessageStreamResponse();
+    } catch (error) {
+      console.error("❌ Error in structured output:", error);
+      return new Response(
+        JSON.stringify({
+          error: "Failed to generate structured output",
+          details: error instanceof Error ? error.message : String(error),
+        }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+  }
+
+  // Otherwise use regular streamText
   const result = streamText({
-    model: "openai/gpt-4.1-mini",
+    model: "openai/gpt-4o-mini", // Changed from gpt-4.1-mini
     tools: availableTools,
     system: systemPrompt,
     messages: convertToModelMessages(messages),

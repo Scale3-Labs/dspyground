@@ -34,6 +34,18 @@ The web app runs at `http://localhost:3000`. The optimizer service runs locally 
 ### Custom Tools
 - Edit `src/lib/tools.ts` to add or replace tools. It contains placeholder tools; anything you define/export there (using `tool(...)`) is automatically available to the agent in chat and optimization—no extra wiring needed.
 
+### Structured Output Mode
+Toggle between regular text streaming (`streamText`) and structured output streaming (`streamObject`) using the switch beside the Teaching Mode button.
+
+**Using JSON Schema:**
+- Edit `data/schema.json` to define your desired output structure
+- The AI will return responses matching your schema when Structured Output mode is enabled
+- Supports nested objects, arrays, and various data types
+- Example use cases: data extraction, classification, form filling, structured analysis
+
+**Using Zod Schema (Code):**
+For programmatic schema definitions, you can modify the API route to use Zod schemas instead of JSON Schema. See the [AI SDK documentation](https://ai-sdk.dev/docs/reference/ai-sdk-core/stream-object) for examples.
+
 ## DSPy and GEPA
 
 - **DSPy** provides the optimization framework used by this project.
