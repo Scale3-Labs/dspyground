@@ -3,191 +3,137 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
 import time
 from pathlib import Path
 from typing import Any, Dict, List
 
-# Minimal DSPy/GEPA setup
-import dspy
-from dspy.teleprompt.gepa import GEPA
+# GEPA standalone module
+# pylint: disable=import-error
+import gepa
 from flask import Flask, jsonify, request
+from openai import OpenAI
 
 app = Flask(__name__)
 
-# Ensure library logs (dspy, tqdm-routed) are emitted at INFO
-# so our handler can capture
+# Ensure library logs are emitted at INFO
 logging.basicConfig(level=logging.INFO)
 logging.getLogger().setLevel(logging.INFO)
-logging.getLogger("dspy").setLevel(logging.INFO)
-logging.getLogger("dspy.teleprompt").setLevel(logging.INFO)
-logging.getLogger("dspy.teleprompt.gepa").setLevel(logging.INFO)
 
-# Configure DSPy once at import time
-# to avoid per-request reconfiguration errors
-API_KEY = os.getenv("AI_GATEWAY_API_KEY") or os.getenv("AI_GATEWAY_API_KEY")
+# API Configuration
+API_KEY = (
+    os.getenv("AI_GATEWAY_API_KEY") or os.getenv("AI_GATEWAY_API_KEY")
+)
 MAIN_MODEL = os.getenv("GEPA_MODEL", "openai/gpt-4.1-mini")
-REFLECTION_MODEL = os.getenv("GEPA_REFLECTION_MODEL", "openai/gpt-4.1")
-
-dspy.configure(lm=dspy.LM(
-    model=MAIN_MODEL,
-    api_key=API_KEY,
-    base_url="https://ai-gateway.vercel.sh/v1"))
-
-
-dspy.configure_cache(
-    enable_disk_cache=False,
-    enable_memory_cache=False,
+REFLECTION_MODEL = os.getenv(
+    "GEPA_REFLECTION_MODEL", "openai/gpt-4.1"
 )
+JUDGE_LM = "google/gemini-2.5-flash"
 
-# Build reflection LM once
-REFLECTION_LM = (
-    dspy.LM(
-        model=REFLECTION_MODEL,
-        api_key=API_KEY,
-        base_url="https://ai-gateway.vercel.sh/v1",
-    )
+# Initialize OpenAI client for LLM-as-a-judge
+openai_client = OpenAI(
+    api_key=API_KEY, base_url="https://ai-gateway.vercel.sh/v1"
 )
-
-
-def build_signature() -> dspy.Signature:
-    class NextTurn(dspy.Signature):
-        """Given the conversation so far, produce the next assistant message.
-
-        Optimize for clear, helpful continuation that improves the chat
-        trajectory. Learn from ideal examples; mirror their structure, tone,
-        and tool usage.
-        """
-        conversationContext = dspy.InputField(
-            desc="Conversation so far (user and assistant turns)",
-            prefix="Conversation so far:"
-        )
-        expectedTurnResponse = dspy.OutputField(
-            desc=(
-                "Next assistant message that advances the dialogue "
-                "(with any tool usage)"
-            ),
-            prefix="Next assistant message:"
-        )
-
-    return NextTurn
-
-
-def build_program() -> dspy.Module:
-    # Simple Predict module over the signature
-    return dspy.Predict(build_signature())
-
-
-class ScoreFeedback(dict):
-    # Dict-like with attribute access for compatibility with GEPA's logs
-    def __getattr__(self, name: str) -> Any:  # fb.score
-        try:
-            return self[name]
-        except KeyError as e:
-            raise AttributeError(name) from e
 
 
 def build_metric():
-    # GEPA metric must accept (gold, pred, trace, pred_name, pred_trace)
-    # Return a float score in [0,1] or a dict {score, feedback}
+    """Build metric function for GEPA optimization.
+
+    Returns a function that evaluates predictions using LLM-as-judge.
+    For reflection calls, returns a dict with {score, feedback}.
+    For regular evaluation, returns a float score.
+    """
+
     def metric(
-        gold: dspy.Example,
-        pred: dspy.Prediction,
-        trace: Any | None = None,
-        pred_name: str | None = None,
-        pred_trace: Any | None = None,
+        example: Dict[str, Any], prediction: Any, trace: Any = None
     ) -> Any:
-        gold_text = getattr(gold, "expectedTurnResponse", "") or ""
-        pred_text = getattr(pred, "expectedTurnResponse", "") or ""
-        # crude token overlap
-        g = set(gold_text.lower().split()) if gold_text else set()
-        p = set(pred_text.lower().split()) if pred_text else set()
-        overlap = len(g & p) if g else 0
-        score = (overlap / len(g)) if g else 0.0
-        # For general evaluation calls, always return a float
-        # (even on missing text)
-        if pred_name is None and pred_trace is None:
+        """Metric function compatible with gepa.optimize().
+
+        Args:
+            example: Dict with expected response
+            prediction: The generated response
+            trace: Optional execution trace
+
+        Returns:
+            float score or dict with {score, feedback}
+        """
+        # Extract expected response from example
+        gold_text = example.get("expectedTurnResponse", "")
+
+        # Extract prediction text
+        if isinstance(prediction, str):
+            pred_text = prediction
+        elif isinstance(prediction, dict):
+            pred_text = (
+                prediction.get("response", "")
+                or prediction.get("answer", "")
+            )
+        else:
+            pred_text = str(prediction)
+
+        # Handle missing text cases
+        if not gold_text or not pred_text:
+            feedback = "Missing gold or predicted text."
+            if trace is not None and isinstance(trace, dict):
+                return {"score": 0.0, "feedback": feedback}
+            return 0.0
+
+        # Use LLM as a judge to evaluate prediction quality
+        try:
+            judge_prompt = f"""You are an expert evaluator. \
+Compare the predicted response against the expected (gold) response.
+
+Expected Response:
+{gold_text}
+
+Predicted Response:
+{pred_text}
+
+Evaluate how well the predicted response matches the expected \
+response in terms of:
+1. Semantic similarity and meaning
+2. Completeness of information
+3. Accuracy of content
+
+Provide a score from 0.0 to 1.0, where:
+- 1.0 = Perfect match or equivalent meaning
+- 0.7-0.9 = Good match with minor differences
+- 0.4-0.6 = Partial match with some key information
+- 0.0-0.3 = Poor match or significant differences
+
+Respond in JSON format with exactly these fields:
+{{"score": <float between 0 and 1>, \
+"feedback": "<brief explanation>"}}"""
+
+            response = openai_client.chat.completions.create(
+                model=JUDGE_LM,
+                messages=[{"role": "user", "content": judge_prompt}],
+                temperature=0.0,
+                response_format={"type": "json_object"},
+            )
+
+            result = json.loads(response.choices[0].message.content)
+            score = float(result.get("score", 0.0))
+            feedback = result.get("feedback", "No feedback provided")
+
+            # Clamp score to [0, 1]
+            score = max(0.0, min(1.0, score))
+
+        except Exception as e:
+            # Fallback to simple token overlap if LLM judge fails
+            g = set(gold_text.lower().split())
+            p = set(pred_text.lower().split())
+            overlap = len(g & p) if g else 0
+            score = (overlap / len(g)) if g else 0.0
+            feedback = f"LLM judge failed, using token overlap: {e}"
+
+        # For reflection calls, return dict
+        if trace is not None and isinstance(trace, dict):
+            return {"score": float(score), "feedback": feedback}
+
+        # For regular evaluation, return float
             return float(score)
-        # For reflection calls, return rich feedback
-        feedback = (
-            f"Overlap tokens: {overlap}/{len(g) if g else 0} "
-            f"for {pred_name or 'program'}."
-        )
-        return ScoreFeedback(
-            score=float(score),
-            feedback=feedback,
-        )
 
     return metric
-
-
-def _extract_instruction_text(compiled: Any) -> str | None:
-    """Best-effort extraction of the optimized instruction/prompt.
-
-    Tries common locations on the compiled module and, if present,
-    on the best candidate from detailed_results.
-    """
-    def _first_text(*candidates: Any) -> str | None:
-        for c in candidates:
-            if isinstance(c, str) and c.strip():
-                return c.strip()
-        return None
-
-    # Direct locations
-    instr = _first_text(
-        getattr(compiled, "instruction", None),
-        getattr(compiled, "instructions", None),
-    )
-    if instr:
-        return instr
-
-    # Common child holders
-    for child_name in ("predict", "predictor"):
-        child = getattr(compiled, child_name, None)
-        if child is None:
-            continue
-        instr = _first_text(
-            getattr(child, "instruction", None),
-            getattr(child, "instructions", None),
-        )
-        if instr:
-            return instr
-        sig = getattr(child, "signature", None)
-        instr = _first_text(
-            getattr(sig, "instructions", None),
-            getattr(sig, "docstring", None),
-        )
-        if instr:
-            return instr
-
-    # Signature on the compiled
-    sig = getattr(compiled, "signature", None)
-    instr = _first_text(
-        getattr(sig, "instructions", None),
-        getattr(sig, "docstring", None),
-    )
-    if instr:
-        return instr
-
-    # Fallback to detailed results best candidate
-    results = getattr(compiled, "detailed_results", None)
-    best = getattr(results, "best_candidate", None)
-    if best is not None:
-        instr = _first_text(
-            getattr(best, "instruction", None),
-            getattr(best, "instructions", None),
-        )
-        if instr:
-            return instr
-        sig = getattr(best, "signature", None)
-        instr = _first_text(
-            getattr(sig, "instructions", None),
-            getattr(sig, "docstring", None),
-        )
-        if instr:
-            return instr
-
-    return None
 
 
 @app.get("/health")
@@ -196,25 +142,18 @@ def health() -> Any:
 
 
 @app.post("/optimize")
-def optimize() -> Any:
+def optimize_endpoint() -> Any:
+    """Optimize chat assistant prompts using GEPA."""
     payload = request.get_json(force=True) or {}
-    examples_input: List[Dict[str, Any]] = payload.get(
-        "examples", []
-    )
-    max_metric_calls: int = int(
-        payload.get("maxMetricCalls", 5)
-    )
-    auto_mode = payload.get("auto")  # off|light|medium|heavy
-    candidate_selection = payload.get("candidateSelectionStrategy")
-    reflection_minibatch_size = payload.get("reflectionMinibatchSize")
-    use_merge = payload.get("useMerge")
-    num_threads = payload.get("numThreads")
+    examples_input: List[Dict[str, Any]] = payload.get("examples", [])
+    max_metric_calls: int = int(payload.get("maxMetricCalls", 50))
 
-    # Optional runtime overrides for models and cache
-    main_model = payload.get("mainModel")
-    reflection_model = payload.get("reflectionModel")
-    enable_disk_cache = payload.get("enableDiskCache")
-    enable_memory_cache = payload.get("enableMemoryCache")
+    # GEPA configuration
+    auto_mode = payload.get("auto", "light")
+
+    # Model configuration
+    main_model = payload.get("mainModel", MAIN_MODEL)
+    reflection_model = payload.get("reflectionModel", REFLECTION_MODEL)
 
     # Streaming trace configuration
     run_id = payload.get("runId")
@@ -227,277 +166,88 @@ def optimize() -> Any:
         except Exception:
             trace_path = None
 
-    # Resolve per-request LMs without reconfiguring global settings
-    local_lm = None
-    if isinstance(main_model, str) and main_model.strip():
-        local_lm = dspy.LM(
-            model=main_model.strip(),
-            api_key=API_KEY,
-            base_url="https://ai-gateway.vercel.sh/v1",
-        )
-    local_reflection_lm = REFLECTION_LM
-    if isinstance(reflection_model, str) and reflection_model.strip():
-        local_reflection_lm = dspy.LM(
-            model=reflection_model.strip(),
-            api_key=API_KEY,
-            base_url="https://ai-gateway.vercel.sh/v1",
-        )
-    if (enable_disk_cache is not None) or (enable_memory_cache is not None):
-        dspy.configure_cache(
-            enable_disk_cache=(
-                bool(enable_disk_cache)
-                if enable_disk_cache is not None
-                else False
-            ),
-            enable_memory_cache=(
-                bool(enable_memory_cache)
-                if enable_memory_cache is not None
-                else False
-            ),
-        )
-
-    # LMs are already configured at import-time; avoid reconfiguration here
-
-    trainset: List[dspy.Example] = []
+    # Prepare trainset (GEPA expects list of dicts)
+    trainset: List[Dict[str, Any]] = []
     for ex in examples_input:
         trainset.append(
-            dspy.Example(
-                conversationContext=ex.get("conversationContext", ""),
-                expectedTurnResponse=ex.get("expectedTurnResponse", ""),
-            ).with_inputs("conversationContext")
+            {
+                "conversationContext": ex.get("conversationContext", ""),
+                "expectedTurnResponse": ex.get(
+                    "expectedTurnResponse", ""
+                ),
+            }
         )
 
-    program = build_program()
+    # Build metric
     metric = build_metric()
 
-    # Run GEPA
+    # Seed candidate: load initial prompt from prompt.md
+    prompt_file = Path(__file__).parent.parent / "data" / "prompt.md"
+    try:
+        with prompt_file.open("r", encoding="utf-8") as f:
+            initial_prompt = f.read().strip()
+    except Exception:
+        # Fallback to default prompt if file doesn't exist
+        initial_prompt = (
+            "Given the conversation so far, produce the next "
+            "assistant message.\n\n"
+            "Optimize for clear, helpful continuation that improves "
+            "the chat trajectory.\n"
+            "Learn from ideal examples; mirror their structure, tone, "
+            "and tool usage."
+        )
+
+    seed_candidate = {"system_prompt": initial_prompt}
+
+    # Run GEPA optimization
     start = time.time()
-    gepa = GEPA(
-        metric=metric,
-        reflection_lm=local_reflection_lm,
-        track_stats=True,
-        max_metric_calls=max_metric_calls,
-        add_format_failure_as_feedback=True,
-        # Map Basic settings if provided
-        auto=(
-            auto_mode
-            if auto_mode in (
-                None,
-                "light",
-                "medium",
-                "heavy",
-            )
-            else None
-        ),
-        candidate_selection_strategy=(
-            candidate_selection
-            if candidate_selection in (None, "pareto", "current_best")
-            else "pareto"
-        ),
-        reflection_minibatch_size=(
-            int(reflection_minibatch_size)
-            if isinstance(reflection_minibatch_size, (int, float, str))
-            and str(reflection_minibatch_size) != ""
-            else 3
-        ),
-        use_merge=bool(use_merge) if use_merge is not None else True,
-        num_threads=(
-            int(num_threads)
-            if isinstance(num_threads, (int, float, str))
-            and str(num_threads) != ""
-            else None
-        ),
-    )
-    # Attach a transient log handler to capture GEPA iteration progress
-    handler: logging.Handler | None = None
-    attached_loggers: list[logging.Logger] = []
-    if trace_path is not None:
-        class _TraceHandler(logging.Handler):
-            def __init__(self, file_path: Path):
-                super().__init__(level=logging.INFO)
-                self.file_path = file_path
-                self.iteration: int | None = None
-                self.best_so_far: float | None = None
-                self._re_iter = re.compile(
-                    r"Iteration\s+(\d+):.*?score:\s*([0-9eE+\-.]+)"
-                )
-                self._re_avg = re.compile(
-                    r"Average Metric:\s*([0-9eE+\-.]+)"
-                )
-                self._re_skip = re.compile(
-                    r"New subsample score is not better, skipping"
-                )
-                # Start of prompt block (reflection proposal)
-                self._re_prompt_start = re.compile(
-                    r"Proposed new text for self:\s*"
-                )
-                self._collecting_prompt = False
-                self._prompt_lines: list[str] = []
-
-            def emit(self, record: logging.LogRecord) -> None:
-                try:
-                    msg = record.getMessage()
-                    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-                    obj: dict[str, Any] | None = None
-
-                    # Helper to flush any collected prompt block
-                    def _flush_prompt_if_any() -> None:
-                        if self._collecting_prompt and self._prompt_lines:
-                            prompt_text = "\n".join(self._prompt_lines).strip()
-                            try:
-                                with self.file_path.open(
-                                    "a", encoding="utf-8"
-                                ) as f:
-                                    f.write(
-                                        json.dumps(
-                                            {
-                                                "type": "prompt",
-                                                "timestamp": now,
-                                                "iteration": self.iteration,
-                                                "prompt": prompt_text,
-                                            }
-                                        )
-                                        + "\n"
-                                    )
-                            except Exception:
-                                pass
-                        self._collecting_prompt = False
-                        self._prompt_lines = []
-
-                    m_iter = self._re_iter.search(msg)
-                    if m_iter:
-                        self.iteration = int(m_iter.group(1))
-                        selected = float(m_iter.group(2))
-                        cond = (
-                            self.best_so_far is None
-                            or selected > self.best_so_far
-                        )
-                        if cond:
-                            self.best_so_far = selected
-                        _flush_prompt_if_any()
-                        obj = {
-                            "type": "iteration",
-                            "timestamp": now,
-                            "iteration": self.iteration,
-                            "selectedProgramScore": selected,
-                            "bestSoFar": self.best_so_far,
-                        }
-                    else:
-                        m_avg = self._re_avg.search(msg)
-                        if m_avg:
-                            avg = float(m_avg.group(1))
-                            _flush_prompt_if_any()
-                            obj = {
-                                "type": "metric",
-                                "timestamp": now,
-                                "iteration": self.iteration,
-                                "averageMetric": avg,
-                                "bestSoFar": self.best_so_far,
-                            }
-                        elif self._re_skip.search(msg):
-                            _flush_prompt_if_any()
-                            obj = {
-                                "type": "note",
-                                "timestamp": now,
-                                "iteration": self.iteration,
-                                "note": (
-                                    "New subsample score is not better, "
-                                    "skipping"
-                                ),
-                                "bestSoFar": self.best_so_far,
-                            }
-                        else:
-                            # Prompt capture handling
-                            m_prompt = self._re_prompt_start.search(msg)
-                            if m_prompt:
-                                after = msg[m_prompt.end():].strip()
-                                self._collecting_prompt = True
-                                self._prompt_lines = []
-                                if after:
-                                    self._prompt_lines.append(after)
-                            elif self._collecting_prompt:
-                                self._prompt_lines.append(msg)
-                    if obj is not None:
-                        with self.file_path.open("a", encoding="utf-8") as f:
-                            f.write(json.dumps(obj) + "\n")
-                except Exception:
-                    # Never raise from logging
-                    pass
-
-        handler = _TraceHandler(trace_path)
-        # Attach to relevant loggers explicitly because some libraries
-        # disable propagation
-        logger_names = [
-            "",  # root
-            "dspy",
-            "dspy.teleprompt",
-            "dspy.teleprompt.gepa",
-            "dspy.teleprompt.gepa.gepa",
-            "dspy.evaluate",
-            "dspy.evaluate.evaluate",
-        ]
-        for name in logger_names:
-            try:
-                lg = logging.getLogger(name)
-                lg.setLevel(logging.INFO)
-                # Ensure records bubble up unless the library overrides it
-                try:
-                    lg.propagate = True  # type: ignore[attr-defined]
-                except Exception:
-                    pass
-                lg.addHandler(handler)
-                attached_loggers.append(lg)
-            except Exception:
-                # Best-effort attach; never fail
-                pass
 
     try:
-        if local_lm is not None:
-            with dspy.settings.context(lm=local_lm):
-                compiled = gepa.compile(
-                    program,
-                    trainset=trainset,
-                    valset=trainset,
-                )
-        else:
-            compiled = gepa.compile(
-                program,
-                trainset=trainset,
-                valset=trainset,
-            )
-    finally:
-        if handler is not None:
-            # Remove from all attached loggers
-            for lg in attached_loggers:
-                try:
-                    lg.removeHandler(handler)
-                except Exception:
-                    pass
+        # Call gepa.optimize() directly
+        gepa_result = gepa.optimize(
+            seed_candidate=seed_candidate,
+            trainset=trainset,
+            valset=trainset,  # Use trainset as valset for now
+            task_lm=main_model,
+            reflection_lm=reflection_model,
+            metric=metric,
+            max_metric_calls=max_metric_calls,
+            auto=auto_mode if auto_mode != "off" else None,
+            api_key=API_KEY,
+            base_url="https://ai-gateway.vercel.sh/v1",
+        )
 
-    # Extract results
-    best_prog = getattr(compiled, "detailed_results", None)
-    best_score = None
-    if best_prog is not None:
-        scores = getattr(best_prog, "val_aggregate_scores", None)
-        idx = getattr(best_prog, "best_idx", None)
-        if isinstance(scores, list) and isinstance(idx, int):
-            try:
-                best_score = float(scores[idx])
-            except Exception:
-                best_score = None
+        # Extract optimized prompt
+        instruction = gepa_result.best_candidate.get("system_prompt", "")
+        best_score = (
+            gepa_result.best_score
+            if hasattr(gepa_result, "best_score")
+            else 0.0
+        )
 
-    instruction = _extract_instruction_text(compiled)
-    demos: List[Any] = []
+    except Exception as e:
+        logging.error("GEPA optimization failed: %s", e)
+        return (
+            jsonify(
+                {
+                    "error": str(e),
+                    "bestScore": 0.0,
+                }
+            ),
+            500,
+        )
+
+    # Build result
     optimized_program: Dict[str, Any] = {
-        "bestScore": best_score if best_score is not None else 0,
+        "bestScore": best_score,
         "instruction": instruction,
-        "demos": demos,
+        "demos": [],
         "examples": examples_input,
         "optimizerType": "GEPA",
         "optimizationTime": int((time.time() - start) * 1000),
         "totalRounds": None,
         "converged": None,
-        "stats": getattr(best_prog, "val_aggregate_scores", None),
+        "stats": None,
     }
 
     result: Dict[str, Any] = {
@@ -521,6 +271,7 @@ def optimize() -> Any:
                 f.write(json.dumps(final_event) + "\n")
         except Exception:
             pass
+
     return jsonify(result)
 
 

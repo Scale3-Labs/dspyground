@@ -1,3 +1,26 @@
 {
-  "samples": []
+  "samples": [
+    {
+      "id": "1760201735147-mcf2n3",
+      "timestamp": "2025-10-11T16:55:35.147Z",
+      "messages": [
+        {
+          "role": "user",
+          "content": "hey whats up"
+        },
+        {
+          "role": "assistant",
+          "content": "hey Karthik! just keeping an eye on things for you. \n\n- I noticed you requested daily catch-up summaries—a great way to stay updated. \n- There's also been some recent chatter about the TripMate app going live and some optimizations being made. \n\nAnything specific on your mind today?"
+        },
+        {
+          "role": "user",
+          "content": "whats up"
+        },
+        {
+          "role": "assistant",
+          "content": "not much, just keeping track of updates. how about you? seeing if there's anything I can help with today."
+        }
+      ]
+    }
+  ]
 }

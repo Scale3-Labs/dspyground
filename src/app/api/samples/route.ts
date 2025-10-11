@@ -1,36 +1,49 @@
+import type { UIMessage } from "ai";
 import { promises as fs } from "fs";
 import path from "path";
 import { z } from "zod";
 
 export const runtime = "nodejs";
 
-const PairSchema = z.object({
-  question: z.string().min(1),
-  answer: z.string().min(1),
-  tool: z.string().optional(),
+// Simple message format: just role and content
+const SimpleMessageSchema = z.object({
+  role: z.string(),
+  content: z.string(),
 });
 
+// Schema for samples with simple messages
 const SessionSchema = z.object({
   id: z.string(),
-  createdAt: z.string(),
-  pairs: z.array(PairSchema).min(1),
+  timestamp: z.string(),
+  messages: z.array(SimpleMessageSchema),
 });
 
 const SamplesSchema = z.object({
   samples: z.array(SessionSchema),
 });
 
-const AddSamplePairs = z.object({
-  pairs: z.array(PairSchema).min(1),
-});
+// Helper function to extract text content from UIMessage parts
+function extractContent(message: UIMessage): string {
+  if (!message.parts || message.parts.length === 0) {
+    return "";
+  }
 
-const AddSampleSingle = z.object({
-  question: z.string().min(1),
-  answer: z.string().min(1),
-  tool: z.string().optional(),
-});
+  // Extract all text parts and join them
+  const textParts = message.parts
+    .filter((part) => part.type === "text")
+    .map((part) => (part as { text?: string }).text || "")
+    .filter(Boolean);
 
-const AddSampleSchema = z.union([AddSamplePairs, AddSampleSingle]);
+  return textParts.join("\n");
+}
+
+// Transform UIMessage array to simple role/content format
+function transformMessages(messages: UIMessage[]) {
+  return messages.map((msg) => ({
+    role: msg.role,
+    content: extractContent(msg),
+  }));
+}
 
 function getSamplesPath() {
   return path.join(process.cwd(), "data", "samples.json");
@@ -50,47 +63,14 @@ async function ensureFile(): Promise<void> {
   }
 }
 
-// Legacy schema for backward compatibility
-const LegacyItemSchema = z.object({
-  id: z.string(),
-  question: z.string(),
-  answer: z.string(),
-  createdAt: z.string(),
-  tool: z.string().optional(),
-});
-
-const LegacySamplesSchema = z.object({
-  good: z.array(LegacyItemSchema),
-  bad: z.array(LegacyItemSchema),
-});
-
 async function readSamples() {
   await ensureFile();
   const data = await fs.readFile(getSamplesPath(), "utf-8");
   const parsed = JSON.parse(data);
   const result = SamplesSchema.safeParse(parsed);
+
   if (result.success) {
     return result.data;
-  }
-
-  // Try legacy parsing and transform to new structure
-  const legacy = LegacySamplesSchema.safeParse(parsed);
-  if (legacy.success) {
-    const transform = (items: z.infer<typeof LegacyItemSchema>[]) =>
-      items.map((it) => ({
-        id: it.id,
-        createdAt: it.createdAt,
-        pairs: [
-          {
-            question: it.question,
-            answer: it.answer,
-            tool: it.tool,
-          },
-        ],
-      }));
-    return {
-      samples: [...transform(legacy.data.good), ...transform(legacy.data.bad)],
-    };
   }
 
   // Reset on invalid file
@@ -124,23 +104,21 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const json = await req.json();
-    const data = AddSampleSchema.parse(json);
+
+    if (!json.messages || !Array.isArray(json.messages)) {
+      throw new Error("Invalid request: messages array required");
+    }
 
     const samples = await readSamples();
-    const session = {
+
+    // Transform UIMessages to simple role/content format
+    const transformedMessages = transformMessages(json.messages as UIMessage[]);
+
+    const session: z.infer<typeof SessionSchema> = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      createdAt: new Date().toISOString(),
-      pairs:
-        "pairs" in data
-          ? data.pairs
-          : [
-              {
-                question: (data as z.infer<typeof AddSampleSingle>).question,
-                answer: (data as z.infer<typeof AddSampleSingle>).answer,
-                tool: (data as z.infer<typeof AddSampleSingle>).tool,
-              },
-            ],
-    } satisfies z.infer<typeof SessionSchema>;
+      timestamp: new Date().toISOString(),
+      messages: transformedMessages,
+    };
     samples.samples.push(session);
 
     await writeSamples(samples);
