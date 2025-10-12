@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:metrics": "npx tsx src/lib/test-metrics.ts",
     "dev:py": "cd python_optimizer && uv run app.py",
     "dev:all": "concurrently -k -n web,py -c auto \"npm run dev\" \"cd python_optimizer && uv run app.py\"",
     "start:all": "concurrently -k -n web,py -c auto \"npm run dev\" \"cd python_optimizer && uv run app.py\""
