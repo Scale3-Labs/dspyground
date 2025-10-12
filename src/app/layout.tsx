@@ -1,3 +1,6 @@
+import { AppSidebar } from "@/components/app-sidebar";
+import { SidebarTriggerButton } from "@/components/sidebar-trigger-button";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import type { Metadata } from "next";
 import { ThemeProvider } from "next-themes";
@@ -35,7 +38,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <SidebarProvider defaultOpen={false}>
+            <AppSidebar />
+            <SidebarTriggerButton />
+            <main className="flex-1 w-full">{children}</main>
+          </SidebarProvider>
           <Toaster />
         </ThemeProvider>
       </body>
