@@ -5,10 +5,36 @@ import { z } from "zod";
 
 export const runtime = "nodejs";
 
-// Simple message format: just role and content
-const SimpleMessageSchema = z.object({
-  role: z.string(),
-  content: z.string(),
+// Part schemas matching AI SDK structure
+const TextPartSchema = z.object({
+  type: z.literal("text"),
+  text: z.string(),
+});
+
+const ToolCallPartSchema = z.object({
+  type: z.literal("tool-call"),
+  toolCallId: z.string(),
+  toolName: z.string(),
+  args: z.any(),
+});
+
+const ToolResultPartSchema = z.object({
+  type: z.literal("tool-result"),
+  toolCallId: z.string(),
+  toolName: z.string(),
+  result: z.any(),
+  isError: z.boolean().optional(),
+});
+
+// Message format matching AI SDK structure
+const MessageSchema = z.object({
+  role: z.enum(["user", "assistant", "tool", "system"]),
+  content: z.union([
+    z.string(),
+    z.array(
+      z.union([TextPartSchema, ToolCallPartSchema, ToolResultPartSchema])
+    ),
+  ]),
 });
 
 // Feedback schema
@@ -17,11 +43,11 @@ const FeedbackSchema = z.object({
   comment: z.string().optional(),
 });
 
-// Schema for samples with simple messages
+// Schema for samples with messages (including tool calls)
 const SessionSchema = z.object({
   id: z.string(),
   timestamp: z.string(),
-  messages: z.array(SimpleMessageSchema),
+  messages: z.array(MessageSchema),
   feedback: FeedbackSchema.optional(),
 });
 
@@ -29,27 +55,80 @@ const SamplesSchema = z.object({
   samples: z.array(SessionSchema),
 });
 
-// Helper function to extract text content from UIMessage parts
-function extractContent(message: UIMessage): string {
-  if (!message.parts || message.parts.length === 0) {
-    return "";
+// Transform UIMessage to AI SDK native message format
+// This splits messages with mixed parts into separate messages
+function transformMessages(messages: UIMessage[]) {
+  const result: z.infer<typeof MessageSchema>[] = [];
+
+  for (const msg of messages) {
+    if (!msg.parts || msg.parts.length === 0) {
+      continue;
+    }
+
+    // Separate parts by type
+    const textParts: any[] = [];
+    const toolUIParts: any[] = [];
+
+    for (const part of msg.parts) {
+      if (part.type === "text") {
+        textParts.push(part);
+      } else if (part.type.startsWith("tool-")) {
+        toolUIParts.push(part);
+      }
+    }
+
+    // Process tool calls first (from ToolUIPart)
+    for (const toolPart of toolUIParts) {
+      // 1. Create assistant message with tool-call
+      result.push({
+        role: "assistant",
+        content: [
+          {
+            type: "tool-call",
+            toolCallId: toolPart.toolCallId || "",
+            toolName: toolPart.type.replace("tool-", ""),
+            args: toolPart.input || {},
+          },
+        ],
+      });
+
+      // 2. Create tool message with tool-result (if output is available)
+      if (
+        toolPart.state === "output-available" &&
+        (toolPart.output !== undefined || toolPart.errorText)
+      ) {
+        result.push({
+          role: "tool",
+          content: [
+            {
+              type: "tool-result",
+              toolCallId: toolPart.toolCallId || "",
+              toolName: toolPart.type.replace("tool-", ""),
+              result: toolPart.errorText || toolPart.output,
+              isError: !!toolPart.errorText,
+            },
+          ],
+        });
+      }
+    }
+
+    // Then add text parts as a separate assistant message
+    if (textParts.length > 0) {
+      const textContent = textParts
+        .map((p) => (p as { text?: string }).text || "")
+        .filter(Boolean)
+        .join("\n");
+
+      if (textContent) {
+        result.push({
+          role: msg.role,
+          content: textContent,
+        });
+      }
+    }
   }
 
-  // Extract all text parts and join them
-  const textParts = message.parts
-    .filter((part) => part.type === "text")
-    .map((part) => (part as { text?: string }).text || "")
-    .filter(Boolean);
-
-  return textParts.join("\n");
-}
-
-// Transform UIMessage array to simple role/content format
-function transformMessages(messages: UIMessage[]) {
-  return messages.map((msg) => ({
-    role: msg.role,
-    content: extractContent(msg),
-  }));
+  return result;
 }
 
 function getSamplesPath() {

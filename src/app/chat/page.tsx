@@ -21,13 +21,20 @@ import {
   PromptInputTools,
 } from "@/components/ai-elements/prompt-input";
 import { Response } from "@/components/ai-elements/response";
+import {
+  Tool,
+  ToolContent,
+  ToolHeader,
+  ToolInput,
+  ToolOutput,
+} from "@/components/ai-elements/tool";
 import { Button } from "@/components/ui/button";
 import { FeedbackDialog } from "@/components/ui/feedback-dialog";
 import { PromptEditorDialog } from "@/components/ui/prompt-editor-dialog";
 import { Switch } from "@/components/ui/switch";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useChat, experimental_useObject as useObject } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, type ToolUIPart } from "ai";
 import { FileText, MessageSquare } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -433,7 +440,34 @@ export default function Chat() {
                                 (part as { text?: string }).text ?? "";
                               return <Response key={i}>{text}</Response>;
                             }
-                            // Skip other part types for now (tools, etc.)
+
+                            // Render tool calls
+                            if (part.type.startsWith("tool-")) {
+                              const toolPart = part as ToolUIPart;
+                              const isCompleted =
+                                toolPart.state === "output-available" ||
+                                toolPart.state === "output-error";
+
+                              return (
+                                <Tool key={i} defaultOpen={isCompleted}>
+                                  <ToolHeader
+                                    type={toolPart.type}
+                                    state={toolPart.state}
+                                  />
+                                  <ToolContent>
+                                    <ToolInput input={toolPart.input} />
+                                    {(toolPart.state === "output-available" ||
+                                      toolPart.state === "output-error") && (
+                                      <ToolOutput
+                                        output={toolPart.output}
+                                        errorText={toolPart.errorText}
+                                      />
+                                    )}
+                                  </ToolContent>
+                                </Tool>
+                              );
+                            }
+
                             return null;
                           })}
                         </MessageContent>
