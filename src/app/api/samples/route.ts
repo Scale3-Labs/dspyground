@@ -11,11 +11,18 @@ const SimpleMessageSchema = z.object({
   content: z.string(),
 });
 
+// Feedback schema
+const FeedbackSchema = z.object({
+  rating: z.enum(["positive", "negative"]),
+  comment: z.string().optional(),
+});
+
 // Schema for samples with simple messages
 const SessionSchema = z.object({
   id: z.string(),
   timestamp: z.string(),
   messages: z.array(SimpleMessageSchema),
+  feedback: FeedbackSchema.optional(),
 });
 
 const SamplesSchema = z.object({
@@ -118,6 +125,12 @@ export async function POST(req: Request) {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       timestamp: new Date().toISOString(),
       messages: transformedMessages,
+      feedback: json.feedback
+        ? {
+            rating: json.feedback.rating,
+            comment: json.feedback.comment,
+          }
+        : undefined,
     };
     samples.samples.push(session);
 

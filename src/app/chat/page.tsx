@@ -22,6 +22,7 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { Response } from "@/components/ai-elements/response";
 import { Button } from "@/components/ui/button";
+import { FeedbackDialog } from "@/components/ui/feedback-dialog";
 import { Switch } from "@/components/ui/switch";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useChat, experimental_useObject as useObject } from "@ai-sdk/react";
@@ -55,6 +56,7 @@ export default function Chat() {
   const [textModels, setTextModels] = useState<GatewayModel[]>([]);
   const [savingSample, setSavingSample] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState<string>("");
+  const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
 
   // Wrap setSelectedModel to prevent empty values
   const setSelectedModel = useCallback(
@@ -241,19 +243,34 @@ export default function Chat() {
     }
   };
 
-  const handleSaveSample = async () => {
+  const handleSaveSample = () => {
+    // Validate that there's content to save before opening dialog
+    if (useStructuredOutput) {
+      if (!currentPrompt || !object) {
+        toast.error("No structured output to save");
+        return;
+      }
+    } else {
+      if (messages.length === 0) {
+        toast.error("No messages to save");
+        return;
+      }
+    }
+
+    // Open feedback dialog
+    setFeedbackDialogOpen(true);
+  };
+
+  const handleSaveWithFeedback = async (feedback: {
+    rating: "positive" | "negative";
+    comment?: string;
+  }) => {
     try {
       setSavingSample(true);
 
       let samplesToSave;
 
       if (useStructuredOutput) {
-        // For structured output, create messages from current prompt and object
-        if (!currentPrompt || !object) {
-          toast.error("No structured output to save");
-          return;
-        }
-
         samplesToSave = [
           {
             id: `user-${Date.now()}`,
@@ -267,18 +284,16 @@ export default function Chat() {
           },
         ];
       } else {
-        // For text mode, use the messages array
-        if (messages.length === 0) {
-          toast.error("No messages to save");
-          return;
-        }
         samplesToSave = messages;
       }
 
       const res = await fetch("/api/samples", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: samplesToSave }),
+        body: JSON.stringify({
+          messages: samplesToSave,
+          feedback,
+        }),
       });
 
       if (!res.ok) {
@@ -286,6 +301,7 @@ export default function Chat() {
       }
 
       toast.success("Sample saved successfully");
+      setFeedbackDialogOpen(false);
     } catch (error) {
       console.error("Error saving sample:", error);
       toast.error("Failed to save sample");
@@ -484,6 +500,14 @@ export default function Chat() {
           </PromptInput>
         </div>
       </div>
+
+      {/* Feedback Dialog */}
+      <FeedbackDialog
+        open={feedbackDialogOpen}
+        onOpenChange={setFeedbackDialogOpen}
+        onSave={handleSaveWithFeedback}
+        isSaving={savingSample}
+      />
     </div>
   );
 }
