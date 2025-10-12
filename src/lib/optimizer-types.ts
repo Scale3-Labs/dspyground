@@ -64,7 +64,13 @@ export interface PromptCandidate {
 }
 
 export interface IterationResult {
-  type: "iteration" | "complete" | "error";
+  type:
+    | "iteration"
+    | "complete"
+    | "error"
+    | "sample_output"
+    | "evaluation_output"
+    | "start";
   iteration: number;
   candidatePrompt?: string;
   batchScore?: number;
@@ -75,6 +81,8 @@ export interface IterationResult {
   message?: string;
   error?: string;
   finalPrompt?: string;
+  sampleId?: string;
+  content?: string;
 }
 
 export interface EvaluationResult {

@@ -63,7 +63,9 @@ async function generateTrajectoryForSample(
   prompt: string,
   model: string,
   useStructuredOutput: boolean,
-  schema?: any
+  schema?: any,
+  sendProgress?: (data: any) => Promise<void>,
+  iteration?: number
 ): Promise<Trajectory> {
   const userMessage = sample.messages.find((m) => m.role === "user");
   const userInput =
@@ -75,6 +77,19 @@ async function generateTrajectoryForSample(
 
   try {
     if (useStructuredOutput && schema) {
+      // Start progress notification
+      if (sendProgress && iteration !== undefined) {
+        await sendProgress({
+          type: "sample_output",
+          iteration,
+          sampleId: sample.id,
+          content: `Generating structured output for sample ${sample.id}...`,
+          accepted: false,
+          collectionSize: 0,
+          bestScore: 0,
+        });
+      }
+
       const result = await generateObject({
         model,
         system: prompt,
@@ -82,17 +97,58 @@ async function generateTrajectoryForSample(
         schema: jsonSchema(schema),
       });
 
+      const outputStr = JSON.stringify(result.object, null, 2);
+
+      // Send final result
+      if (sendProgress && iteration !== undefined) {
+        await sendProgress({
+          type: "sample_output",
+          iteration,
+          sampleId: sample.id,
+          content: outputStr,
+          accepted: false,
+          collectionSize: 0,
+          bestScore: 0,
+        });
+      }
+
       predictedMessages = [
         { role: "user", content: userInput },
-        { role: "assistant", content: JSON.stringify(result.object, null, 2) },
+        { role: "assistant", content: outputStr },
       ];
     } else {
+      // Start progress notification
+      if (sendProgress && iteration !== undefined) {
+        await sendProgress({
+          type: "sample_output",
+          iteration,
+          sampleId: sample.id,
+          content: `Generating response for sample ${sample.id}...`,
+          accepted: false,
+          collectionSize: 0,
+          bestScore: 0,
+        });
+      }
+
       const result = await generateText({
         model,
         system: prompt,
         prompt: userInput,
         tools: availableTools,
       });
+
+      // Send final text result
+      if (sendProgress && iteration !== undefined) {
+        await sendProgress({
+          type: "sample_output",
+          iteration,
+          sampleId: sample.id,
+          content: result.text,
+          accepted: false,
+          collectionSize: 0,
+          bestScore: 0,
+        });
+      }
 
       predictedMessages = [{ role: "user", content: userInput }];
 
@@ -164,7 +220,9 @@ async function evaluateSampleWithPrompt(
   reflectionModel: string,
   selectedMetrics: string[],
   useStructuredOutput: boolean,
-  schema?: any
+  schema?: any,
+  sendProgress?: (data: any) => Promise<void>,
+  iteration?: number
 ): Promise<{
   metrics: MetricScores;
   overallScore: number;
@@ -173,13 +231,15 @@ async function evaluateSampleWithPrompt(
 }> {
   console.log(`[Judge] Evaluating sample ${sample.id}...`);
 
-  // Generate trajectory using current prompt
+  // Generate trajectory using current prompt with streaming
   const generatedTrajectory = await generateTrajectoryForSample(
     sample,
     currentPrompt,
     model,
     useStructuredOutput,
-    schema
+    schema,
+    sendProgress,
+    iteration
   );
 
   // Use the imported judgeAndScoreSample function from metrics.ts
@@ -189,6 +249,20 @@ async function evaluateSampleWithPrompt(
     reflectionModel,
     selectedMetrics
   );
+
+  // Stream the evaluation result
+  if (sendProgress && iteration !== undefined) {
+    await sendProgress({
+      type: "evaluation_output",
+      iteration,
+      content: `Sample ${sample.id}: Score ${result.overallScore.toFixed(2)}\n${
+        result.detailedFeedback
+      }`,
+      accepted: false,
+      collectionSize: 0,
+      bestScore: 0,
+    });
+  }
 
   console.log(
     `[Judge] Sample ${sample.id} - Overall: ${result.overallScore.toFixed(2)}`
@@ -205,7 +279,9 @@ async function evaluateBatch(
   reflectionModel: string,
   selectedMetrics: string[],
   useStructuredOutput: boolean,
-  schema?: any
+  schema?: any,
+  sendProgress?: (data: any) => Promise<void>,
+  iteration?: number
 ): Promise<{
   metrics: MetricScores;
   overallScore: number;
@@ -224,19 +300,22 @@ async function evaluateBatch(
     };
   }
 
-  const results = await Promise.all(
-    samples.map((s) =>
-      evaluateSampleWithPrompt(
-        s,
-        prompt,
-        model,
-        reflectionModel,
-        selectedMetrics,
-        useStructuredOutput,
-        schema
-      )
-    )
-  );
+  // Evaluate samples sequentially to stream properly (not in parallel)
+  const results = [];
+  for (const s of samples) {
+    const result = await evaluateSampleWithPrompt(
+      s,
+      prompt,
+      model,
+      reflectionModel,
+      selectedMetrics,
+      useStructuredOutput,
+      schema,
+      sendProgress,
+      iteration
+    );
+    results.push(result);
+  }
 
   // Aggregate metrics
   const aggregatedMetrics: MetricScores = {};
@@ -422,7 +501,9 @@ async function runGEPA(
     config.reflectionModel,
     config.selectedMetrics,
     config.useStructuredOutput || false,
-    schema
+    schema,
+    sendProgress,
+    0
   );
 
   const collection: PromptCandidate[] = [
@@ -474,7 +555,9 @@ async function runGEPA(
       config.reflectionModel,
       config.selectedMetrics,
       config.useStructuredOutput || false,
-      schema
+      schema,
+      sendProgress,
+      iteration
     );
 
     console.log(
@@ -497,7 +580,9 @@ async function runGEPA(
       config.reflectionModel,
       config.selectedMetrics,
       config.useStructuredOutput || false,
-      schema
+      schema,
+      sendProgress,
+      iteration
     );
 
     console.log(

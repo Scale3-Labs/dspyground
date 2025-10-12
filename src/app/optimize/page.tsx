@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import type { IterationResult, MetricType } from "@/lib/optimizer-types";
@@ -26,16 +27,8 @@ import {
   METRIC_DESCRIPTIONS,
   METRIC_LABELS,
 } from "@/lib/optimizer-types";
-import {
-  AlertCircle,
-  CheckCircle2,
-  Edit,
-  Info,
-  Loader2,
-  Play,
-  Square,
-} from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { Edit, Info, Loader2, Play, Square } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 type GatewayModel = {
@@ -51,6 +44,15 @@ type ChartPoint = {
   best?: number;
   avg?: number;
   prompt?: string;
+};
+
+type StreamLogEntry = {
+  type: "iteration_start" | "sample" | "evaluation" | "iteration_end" | "final";
+  iteration?: number;
+  sampleId?: string;
+  content?: string;
+  prompt?: string;
+  timestamp: number;
 };
 
 export default function OptimizePage() {
@@ -78,6 +80,9 @@ export default function OptimizePage() {
   const [chartData, setChartData] = useState<ChartPoint[]>([]);
   const [finalPrompt, setFinalPrompt] = useState<string>("");
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+  const [streamLogs, setStreamLogs] = useState<StreamLogEntry[]>([]);
+  const [activeTab, setActiveTab] = useState<string>("settings");
+  const logsEndRef = useRef<HTMLDivElement>(null);
 
   // Load preferences on mount
   useEffect(() => {
@@ -171,6 +176,11 @@ export default function OptimizePage() {
     preferencesLoaded,
   ]);
 
+  // Auto-scroll logs
+  useEffect(() => {
+    logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [streamLogs]);
+
   const handleMetricToggle = (metric: MetricType) => {
     setSelectedMetrics((prev) =>
       prev.includes(metric)
@@ -194,6 +204,8 @@ export default function OptimizePage() {
     setIterations([]);
     setChartData([]);
     setFinalPrompt("");
+    setStreamLogs([]);
+    setActiveTab("progress"); // Switch to progress tab
 
     try {
       const response = await fetch("/api/optimize", {
@@ -253,6 +265,49 @@ export default function OptimizePage() {
 
             setIterations((prev) => [...prev, result]);
 
+            // Process stream logs
+            if (result.type === "iteration") {
+              setStreamLogs((prev) => [
+                ...prev,
+                {
+                  type: "iteration_start",
+                  iteration: result.iteration,
+                  timestamp: Date.now(),
+                },
+              ]);
+            }
+
+            // Handle sample streaming logs (added by API updates)
+            if (
+              result.type === "sample_output" &&
+              "sampleId" in result &&
+              "content" in result
+            ) {
+              setStreamLogs((prev) => [
+                ...prev,
+                {
+                  type: "sample",
+                  iteration: result.iteration,
+                  sampleId: (result as any).sampleId,
+                  content: (result as any).content,
+                  timestamp: Date.now(),
+                },
+              ]);
+            }
+
+            // Handle evaluation logs (added by API updates)
+            if (result.type === "evaluation_output" && "content" in result) {
+              setStreamLogs((prev) => [
+                ...prev,
+                {
+                  type: "evaluation",
+                  iteration: result.iteration,
+                  content: (result as any).content,
+                  timestamp: Date.now(),
+                },
+              ]);
+            }
+
             // Update chart data
             if (result.type === "iteration" || result.type === "complete") {
               setChartData((prev) => [
@@ -264,10 +319,30 @@ export default function OptimizePage() {
                   prompt: result.candidatePrompt,
                 },
               ]);
+
+              if (result.candidatePrompt) {
+                setStreamLogs((prev) => [
+                  ...prev,
+                  {
+                    type: "iteration_end",
+                    iteration: result.iteration,
+                    prompt: result.candidatePrompt,
+                    timestamp: Date.now(),
+                  },
+                ]);
+              }
             }
 
             if (result.type === "complete" && result.finalPrompt) {
               setFinalPrompt(result.finalPrompt);
+              setStreamLogs((prev) => [
+                ...prev,
+                {
+                  type: "final",
+                  prompt: result.finalPrompt,
+                  timestamp: Date.now(),
+                },
+              ]);
               toast.success("Optimization complete!");
             }
 
@@ -301,9 +376,6 @@ export default function OptimizePage() {
     toast.info("Stopping optimization...");
   };
 
-  const currentIteration =
-    iterations.length > 0 ? iterations[iterations.length - 1] : null;
-
   return (
     <div className="font-sans w-full min-h-screen bg-background">
       {/* Header */}
@@ -314,323 +386,336 @@ export default function OptimizePage() {
               <h1 className="text-xl font-medium">Prompt Optimizer</h1>
               <ThemeToggle />
             </div>
-            <div className="flex items-center gap-2">
-              {isOptimizing ? (
-                <Button variant="destructive" size="sm" onClick={handleStop}>
-                  <Square className="size-4 mr-2" />
-                  Stop
-                </Button>
-              ) : (
-                <Button size="sm" onClick={handleStartOptimization}>
-                  <Play className="size-4 mr-2" />
-                  Start Optimization
-                </Button>
-              )}
-            </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Panel: Settings */}
-          <div className="space-y-6">
-            <div className="border rounded-lg p-6 bg-card">
-              <h2 className="text-lg font-semibold mb-4">Settings</h2>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="mb-6">
+            <TabsTrigger value="settings">Settings</TabsTrigger>
+            <TabsTrigger value="progress">Progress</TabsTrigger>
+          </TabsList>
 
-              {/* System Prompt (Read-only) */}
-              <div className="space-y-2 mb-4">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium">
-                    System Prompt (from prompt.md)
-                  </label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setPromptEditorOpen(true)}
-                    className="h-7 gap-1.5"
-                  >
-                    <Edit className="h-3.5 w-3.5" />
-                    Edit
-                  </Button>
-                </div>
-                <Textarea
-                  value={systemPrompt}
-                  readOnly
-                  className="min-h-[100px] font-mono text-xs bg-muted cursor-pointer"
-                  placeholder="Loading prompt..."
-                  onClick={() => setPromptEditorOpen(true)}
-                />
-              </div>
+          {/* Settings Tab */}
+          <TabsContent value="settings" className="mt-0">
+            <div className="flex gap-6">
+              <div className="flex-1 space-y-6">
+                <div className="border rounded-lg p-6 bg-card">
+                  <h2 className="text-lg font-semibold mb-4">Configuration</h2>
 
-              <Separator className="my-4" />
-
-              {/* Optimization Model */}
-              <div className="space-y-2 mb-4">
-                <label className="text-sm font-medium">
-                  Optimization Model (Task Model)
-                </label>
-                <Select
-                  value={optimizationModel}
-                  onValueChange={setOptimizationModel}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select model" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {textModels.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Reflection Model */}
-              <div className="space-y-2 mb-4">
-                <label className="text-sm font-medium">
-                  Reflection Model (Improves Prompts)
-                </label>
-                <Select
-                  value={reflectionModel}
-                  onValueChange={setReflectionModel}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select model" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {textModels.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Separator className="my-4" />
-
-              {/* Batch Size */}
-              <div className="space-y-2 mb-4">
-                <label className="text-sm font-medium">
-                  Batch Size (samples per iteration)
-                </label>
-                <Input
-                  type="number"
-                  min="1"
-                  max="10"
-                  value={batchSize}
-                  onChange={(e) => setBatchSize(Number(e.target.value))}
-                />
-              </div>
-
-              {/* Number of Rollouts */}
-              <div className="space-y-2 mb-4">
-                <label className="text-sm font-medium">
-                  Number of Rollouts (iterations)
-                </label>
-                <Input
-                  type="number"
-                  min="1"
-                  max="50"
-                  value={numRollouts}
-                  onChange={(e) => setNumRollouts(Number(e.target.value))}
-                />
-              </div>
-
-              <Separator className="my-4" />
-
-              {/* Output Mode */}
-              <div className="space-y-2 mb-4">
-                <label className="text-sm font-medium">Output Mode</label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={optimizeStructuredOutput}
-                    onChange={(e) =>
-                      setOptimizeStructuredOutput(e.target.checked)
-                    }
-                    className="rounded"
-                  />
-                  <span className="text-sm">
-                    Structured Output (uses schema.json)
-                  </span>
-                </label>
-              </div>
-
-              <Separator className="my-4" />
-
-              {/* Metrics */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium">Metrics</label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setMetricPromptEditorOpen(true)}
-                    className="h-7 gap-1.5"
-                  >
-                    <Edit className="h-3.5 w-3.5" />
-                    Edit Prompts
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  {AVAILABLE_METRICS.map((metric) => (
-                    <div key={metric} className="flex items-start gap-2">
-                      <input
-                        type="checkbox"
-                        id={`metric-${metric}`}
-                        checked={selectedMetrics.includes(metric)}
-                        onChange={() => handleMetricToggle(metric)}
-                        className="rounded mt-0.5 cursor-pointer"
-                      />
-                      <label
-                        htmlFor={`metric-${metric}`}
-                        className="flex items-center gap-1.5 cursor-pointer flex-1"
-                      >
-                        <span className="text-sm font-medium">
-                          {METRIC_LABELS[metric]}
-                        </span>
-                        <HoverCard>
-                          <HoverCardTrigger asChild>
-                            <Info className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground transition-colors" />
-                          </HoverCardTrigger>
-                          <HoverCardContent className="w-80" side="right">
-                            <div className="space-y-2">
-                              <h4 className="text-sm font-semibold">
-                                {METRIC_LABELS[metric]}
-                              </h4>
-                              <p className="text-sm text-muted-foreground">
-                                {METRIC_DESCRIPTIONS[metric]}
-                              </p>
-                            </div>
-                          </HoverCardContent>
-                        </HoverCard>
+                  {/* System Prompt (Read-only) */}
+                  <div className="space-y-2 mb-4">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">
+                        System Prompt (from prompt.md)
                       </label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setPromptEditorOpen(true)}
+                        className="h-7 gap-1.5"
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                        Edit
+                      </Button>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Panel: Progress */}
-          <div className="space-y-6">
-            {/* Status Card */}
-            <div className="border rounded-lg p-6 bg-card">
-              <h2 className="text-lg font-semibold mb-4">Progress</h2>
-
-              {isOptimizing && (
-                <div className="flex items-center gap-2 mb-4 text-blue-600">
-                  <Loader2 className="size-4 animate-spin" />
-                  <span className="text-sm font-medium">Optimizing...</span>
-                </div>
-              )}
-
-              {currentIteration && (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <div className="text-xs text-muted-foreground">
-                        Iteration
-                      </div>
-                      <div className="text-lg font-semibold">
-                        {currentIteration.iteration} / {numRollouts}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">
-                        Best Score
-                      </div>
-                      <div className="text-lg font-semibold">
-                        {currentIteration.bestScore.toFixed(3)}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">
-                        Collection Size
-                      </div>
-                      <div className="text-lg font-semibold">
-                        {currentIteration.collectionSize}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">
-                        Status
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {currentIteration.accepted ? (
-                          <CheckCircle2 className="size-4 text-green-600" />
-                        ) : (
-                          <AlertCircle className="size-4 text-amber-600" />
-                        )}
-                        <span className="text-sm">
-                          {currentIteration.accepted ? "Accepted" : "Rejected"}
-                        </span>
-                      </div>
-                    </div>
+                    <Textarea
+                      value={systemPrompt}
+                      readOnly
+                      className="min-h-[100px] font-mono text-xs bg-muted cursor-pointer"
+                      placeholder="Loading prompt..."
+                      onClick={() => setPromptEditorOpen(true)}
+                    />
                   </div>
 
-                  {currentIteration.message && (
-                    <div className="text-xs text-muted-foreground mt-2">
-                      {currentIteration.message}
-                    </div>
-                  )}
+                  <Separator className="my-4" />
 
-                  {currentIteration.error && (
-                    <div className="text-xs text-red-600 mt-2">
-                      {currentIteration.error}
+                  {/* Optimization Model */}
+                  <div className="space-y-2 mb-4">
+                    <label className="text-sm font-medium">
+                      Optimization Model (Task Model)
+                    </label>
+                    <Select
+                      value={optimizationModel}
+                      onValueChange={setOptimizationModel}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select model" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {textModels.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Reflection Model */}
+                  <div className="space-y-2 mb-4">
+                    <label className="text-sm font-medium">
+                      Reflection Model (Improves Prompts)
+                    </label>
+                    <Select
+                      value={reflectionModel}
+                      onValueChange={setReflectionModel}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select model" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {textModels.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <Separator className="my-4" />
+
+                  {/* Batch Size */}
+                  <div className="space-y-2 mb-4">
+                    <label className="text-sm font-medium">
+                      Batch Size (samples per iteration)
+                    </label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={batchSize}
+                      onChange={(e) => setBatchSize(Number(e.target.value))}
+                    />
+                  </div>
+
+                  {/* Number of Rollouts */}
+                  <div className="space-y-2 mb-4">
+                    <label className="text-sm font-medium">
+                      Number of Rollouts (iterations)
+                    </label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="50"
+                      value={numRollouts}
+                      onChange={(e) => setNumRollouts(Number(e.target.value))}
+                    />
+                  </div>
+
+                  <Separator className="my-4" />
+
+                  {/* Output Mode */}
+                  <div className="space-y-2 mb-4">
+                    <label className="text-sm font-medium">Output Mode</label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={optimizeStructuredOutput}
+                        onChange={(e) =>
+                          setOptimizeStructuredOutput(e.target.checked)
+                        }
+                        className="rounded"
+                      />
+                      <span className="text-sm">
+                        Structured Output (uses schema.json)
+                      </span>
+                    </label>
+                  </div>
+
+                  <Separator className="my-4" />
+
+                  {/* Metrics */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">Metrics</label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setMetricPromptEditorOpen(true)}
+                        className="h-7 gap-1.5"
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                        Edit Prompts
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      {AVAILABLE_METRICS.map((metric) => (
+                        <div key={metric} className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            id={`metric-${metric}`}
+                            checked={selectedMetrics.includes(metric)}
+                            onChange={() => handleMetricToggle(metric)}
+                            className="rounded mt-0.5 cursor-pointer"
+                          />
+                          <label
+                            htmlFor={`metric-${metric}`}
+                            className="flex items-center gap-1.5 cursor-pointer flex-1"
+                          >
+                            <span className="text-sm font-medium">
+                              {METRIC_LABELS[metric]}
+                            </span>
+                            <HoverCard>
+                              <HoverCardTrigger asChild>
+                                <Info className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground transition-colors" />
+                              </HoverCardTrigger>
+                              <HoverCardContent className="w-80" side="right">
+                                <div className="space-y-2">
+                                  <h4 className="text-sm font-semibold">
+                                    {METRIC_LABELS[metric]}
+                                  </h4>
+                                  <p className="text-sm text-muted-foreground">
+                                    {METRIC_DESCRIPTIONS[metric]}
+                                  </p>
+                                </div>
+                              </HoverCardContent>
+                            </HoverCard>
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right side: Optimize Button */}
+              <div className="w-64 space-y-4">
+                <div className="border rounded-lg p-6 bg-card sticky top-6">
+                  <h2 className="text-lg font-semibold mb-4">Actions</h2>
+                  {isOptimizing ? (
+                    <Button
+                      variant="destructive"
+                      className="w-full"
+                      onClick={handleStop}
+                    >
+                      <Square className="size-4 mr-2" />
+                      Stop
+                    </Button>
+                  ) : (
+                    <Button
+                      className="w-full"
+                      onClick={handleStartOptimization}
+                    >
+                      <Play className="size-4 mr-2" />
+                      Start Optimization
+                    </Button>
+                  )}
+                  {isOptimizing && (
+                    <div className="flex items-center gap-2 mt-4 text-blue-600">
+                      <Loader2 className="size-4 animate-spin" />
+                      <span className="text-sm font-medium">Running...</span>
                     </div>
                   )}
                 </div>
-              )}
-
-              {!isOptimizing && iterations.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  Click &quot;Start Optimization&quot; to begin the GEPA
-                  algorithm.
-                </p>
-              )}
+              </div>
             </div>
+          </TabsContent>
 
-            {/* Chart */}
-            {chartData.length > 0 && (
+          {/* Progress Tab */}
+          <TabsContent value="progress" className="mt-0">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Left Half: Streaming Logs */}
+              <div className="border rounded-lg p-6 bg-card">
+                <h2 className="text-lg font-semibold mb-4">Live Stream</h2>
+                <div className="h-[calc(100vh-280px)] overflow-y-auto space-y-4 font-mono text-xs">
+                  {streamLogs.length === 0 && !isOptimizing && (
+                    <p className="text-sm text-muted-foreground">
+                      Start optimization to see live logs...
+                    </p>
+                  )}
+
+                  {streamLogs.map((log, index) => (
+                    <div key={index} className="space-y-2">
+                      {log.type === "iteration_start" && (
+                        <div className="font-bold text-blue-600 text-sm border-b pb-2">
+                          === Iteration {log.iteration} ===
+                        </div>
+                      )}
+
+                      {log.type === "sample" && (
+                        <div className="pl-4 space-y-1">
+                          <div className="text-muted-foreground">
+                            Sample {log.sampleId}:
+                          </div>
+                          <div className="bg-muted/50 p-2 rounded whitespace-pre-wrap break-words">
+                            {log.content}
+                          </div>
+                        </div>
+                      )}
+
+                      {log.type === "evaluation" && (
+                        <div className="pl-4 space-y-1">
+                          <div className="text-amber-600 font-semibold">
+                            Evaluation:
+                          </div>
+                          <div className="bg-amber-50 dark:bg-amber-900/20 p-2 rounded whitespace-pre-wrap break-words">
+                            {log.content}
+                          </div>
+                        </div>
+                      )}
+
+                      {log.type === "iteration_end" && log.prompt && (
+                        <div className="pl-4 space-y-1 border-t pt-2">
+                          <div className="text-green-600 font-semibold">
+                            Selected Prompt:
+                          </div>
+                          <div className="bg-green-50 dark:bg-green-900/20 p-2 rounded whitespace-pre-wrap break-words">
+                            {log.prompt}
+                          </div>
+                        </div>
+                      )}
+
+                      {log.type === "final" && log.prompt && (
+                        <div className="space-y-1 border-t-2 border-green-600 pt-4">
+                          <div className="text-green-600 font-bold text-base">
+                            🎉 Final Optimized Prompt:
+                          </div>
+                          <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded whitespace-pre-wrap break-words">
+                            {log.prompt}
+                          </div>
+                          <Button
+                            className="mt-2"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              navigator.clipboard.writeText(log.prompt || "");
+                              toast.success("Copied to clipboard!");
+                            }}
+                          >
+                            Copy to Clipboard
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  <div ref={logsEndRef} />
+                </div>
+              </div>
+
+              {/* Right Half: Chart */}
               <div className="border rounded-lg p-6 bg-card">
                 <h2 className="text-lg font-semibold mb-4">Score Over Time</h2>
-                <div className="h-[300px]">
-                  <OptimizeLiveChart data={chartData} />
-                </div>
+                {chartData.length > 0 ? (
+                  <div className="h-[calc(100vh-280px)]">
+                    <OptimizeLiveChart data={chartData} />
+                  </div>
+                ) : (
+                  <div className="h-[calc(100vh-280px)] flex items-center justify-center">
+                    <p className="text-sm text-muted-foreground">
+                      Chart will appear as optimization progresses...
+                    </p>
+                  </div>
+                )}
               </div>
-            )}
-
-            {/* Final Prompt */}
-            {finalPrompt && (
-              <div className="border rounded-lg p-6 bg-card">
-                <h2 className="text-lg font-semibold mb-4">Optimized Prompt</h2>
-                <Textarea
-                  value={finalPrompt}
-                  readOnly
-                  className="min-h-[200px] font-mono text-xs"
-                />
-                <Button
-                  className="mt-4"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(finalPrompt);
-                    toast.success("Copied to clipboard!");
-                  }}
-                >
-                  Copy to Clipboard
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Prompt Editor Dialog */}
