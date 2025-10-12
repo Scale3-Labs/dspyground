@@ -1,4 +1,3 @@
-import * as availableTools from "@/lib/tools";
 import {
   convertToModelMessages,
   jsonSchema,
@@ -9,6 +8,7 @@ import {
 import "dotenv/config";
 import fs from "fs/promises";
 import path from "path";
+import * as availableTools from "../../../../data/tools";
 
 export const maxDuration = 30;
 
