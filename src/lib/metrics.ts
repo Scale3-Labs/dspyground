@@ -1,8 +1,7 @@
 import { generateObject } from "ai";
+import fs from "fs/promises";
+import path from "path";
 import { z } from "zod";
-
-// Model constant for LLM as a judge
-export const JUDGE_MODEL = "openai/gpt-4o-mini";
 
 // Type definitions for trajectories/samples
 export interface Message {
@@ -14,8 +13,8 @@ export interface Message {
         text?: string;
         toolCallId?: string;
         toolName?: string;
-        args?: any;
-        result?: any;
+        args?: unknown;
+        result?: unknown;
         isError?: boolean;
       }>;
 }
@@ -30,171 +29,236 @@ export interface Trajectory {
   };
 }
 
-// Schema for Metric 0: Accuracy and Tool Targeting Evaluation
-const AccuracyMetricSchema = z.object({
-  score: z
+// Unified Reflection-Based Scoring Schema
+export const ReflectionScoreSchema = z.object({
+  tone: z
     .number()
-    .min(-1)
+    .min(0)
     .max(1)
     .describe(
-      "Score from -1 to 1 indicating accuracy. 1 = perfect match, 0 = partially correct, -1 = completely incorrect"
+      "Tone appropriateness (0-1): Does the response match the desired communication style?"
     ),
-  is_accurate: z
-    .boolean()
-    .describe("Whether the predicted solution matches the gold solution"),
-  tool_targeting_correct: z
-    .boolean()
-    .describe("Whether the correct tools were targeted and used appropriately"),
-  feedback: z
+  accuracy: z
+    .number()
+    .min(0)
+    .max(1)
+    .describe(
+      "Response accuracy (0-1): Is the information correct and does it properly address the query?"
+    ),
+  efficiency: z
+    .number()
+    .min(0)
+    .max(1)
+    .describe(
+      "Efficiency score (0-1): Measures the number of turns (assistant responses) and tool calls. Lower score if the model makes unnecessary tool calls or takes extra turns to reach the solution. Example: calling tool1 when not needed, then realizing tool2 is required = less efficient."
+    ),
+  tool_accuracy: z
+    .number()
+    .min(0)
+    .max(1)
+    .describe(
+      "Tool selection correctness (0-1): Were the right tools called at the right time?"
+    ),
+  guardrails: z
+    .number()
+    .min(0)
+    .max(1)
+    .describe(
+      "Safety and guardrail compliance (0-1): Does the response follow safety guidelines and constraints?"
+    ),
+  overall_score: z
+    .number()
+    .min(0)
+    .max(1)
+    .describe("Weighted overall score combining all dimensions"),
+  detailed_feedback: z
     .string()
     .describe(
-      "Detailed feedback explaining why the solution is or isn't accurate, and whether tool targeting is correct. Should address: 1) correctness of the final answer, 2) appropriateness of tool selection, 3) any errors or issues in the trajectory"
+      "Detailed analysis explaining the scores and what went well or poorly"
     ),
-  tool_comparison: z
+  suggested_improvements: z
     .string()
     .describe(
-      "Comparison of tool usage between gold and predicted trajectories"
+      "Specific, actionable suggestions for improving the prompt to address the issues found"
     ),
 });
 
-export type AccuracyMetricResult = z.infer<typeof AccuracyMetricSchema>;
-
-// Schema for Metric 1: Efficiency Evaluation
-const EfficiencyMetricSchema = z.object({
-  score: z
-    .number()
-    .describe(
-      "Positive score if predicted is more efficient, negative if less efficient, 0 if equal efficiency. Magnitude indicates degree of difference"
-    ),
-  predicted_steps: z.number().describe("Number of assistant turns/steps taken"),
-  predicted_tool_calls: z.number().describe("Number of tool calls made"),
-  gold_steps: z.number().describe("Number of assistant turns/steps in gold"),
-  gold_tool_calls: z.number().describe("Number of tool calls in gold"),
-  efficiency_ratio: z
-    .number()
-    .describe(
-      "Ratio of predicted efficiency to gold efficiency (lower is better for predicted)"
-    ),
-  feedback: z
-    .string()
-    .describe(
-      "Explanation of the efficiency comparison, highlighting unnecessary steps or tool calls"
-    ),
-});
-
-export type EfficiencyMetricResult = z.infer<typeof EfficiencyMetricSchema>;
+export type ReflectionScore = z.infer<typeof ReflectionScoreSchema>;
 
 /**
- * Metric 0: Accuracy and Tool Targeting Evaluation
- * Compares a predicted trajectory against a gold trajectory to assess:
- * - Accuracy of the final solution
- * - Correctness of tool targeting and usage
+ * Load metrics prompts configuration from JSON file
  */
-export async function evaluateAccuracy(
-  goldTrajectory: Trajectory,
-  predictedTrajectory: Trajectory
-): Promise<AccuracyMetricResult> {
-  const prompt = `You are an expert evaluator assessing agent trajectories.
-
-TASK: Compare the predicted agent trajectory against the gold (reference) trajectory and evaluate:
-1. Whether the final solution is accurate
-2. Whether the correct tools were targeted and used appropriately
-
-GOLD TRAJECTORY (Reference):
-${JSON.stringify(goldTrajectory, null, 2)}
-
-PREDICTED TRAJECTORY (To Evaluate):
-${JSON.stringify(predictedTrajectory, null, 2)}
-
-EVALUATION CRITERIA:
-1. ACCURACY: Does the predicted trajectory arrive at the same or equivalent final answer as the gold trajectory?
-2. TOOL TARGETING: 
-   - Are the same or equivalent tools used?
-   - Are tools used in appropriate contexts?
-   - Are there any missing or extraneous tool calls?
-3. QUALITY: Is the reasoning sound and the execution correct?
-
-Provide a detailed evaluation focusing on:
-- Why the solution is or isn't accurate
-- Whether tool selection and usage is correct
-- Any specific errors or improvements needed`;
-
-  const result = await generateObject({
-    model: JUDGE_MODEL,
-    schema: AccuracyMetricSchema,
-    prompt,
-  });
-
-  return result.object;
+async function loadMetricsPrompts(): Promise<{
+  evaluation_instructions: string;
+  dimensions: Record<
+    string,
+    { name: string; description: string; weight: number }
+  >;
+  positive_feedback_instruction: string;
+  negative_feedback_instruction: string;
+  comparison_positive: string;
+  comparison_negative: string;
+}> {
+  try {
+    const filePath = path.join(process.cwd(), "data", "metrics-prompt.json");
+    const data = await fs.readFile(filePath, "utf-8");
+    return JSON.parse(data);
+  } catch (error) {
+    console.error("[Metrics] Failed to load metrics prompts:", error);
+    // Return defaults if file doesn't exist
+    return {
+      evaluation_instructions:
+        "You are an expert AI evaluator. Evaluate the generated agent trajectory.",
+      dimensions: {
+        tone: {
+          name: "Tone",
+          description:
+            "Does it match the desired communication style? Consider the user feedback about tone.",
+          weight: 1.0,
+        },
+        accuracy: {
+          name: "Accuracy",
+          description: "Is the information correct and helpful?",
+          weight: 1.0,
+        },
+        efficiency: {
+          name: "Efficiency",
+          description:
+            "Count the number of assistant turns and tool calls. Lower score for unnecessary tool calls or extra turns.",
+          weight: 1.0,
+        },
+        tool_accuracy: {
+          name: "Tool Accuracy",
+          description: "Were the right tools used appropriately?",
+          weight: 1.0,
+        },
+        guardrails: {
+          name: "Guardrails",
+          description: "Does it follow safety guidelines and constraints?",
+          weight: 1.0,
+        },
+      },
+      positive_feedback_instruction:
+        "This is a POSITIVE example (user approved this response).\nYour task: Compare the generated trajectory to the gold trajectory.\nThe generated response should match or exceed the quality of the gold trajectory.",
+      negative_feedback_instruction:
+        "This is a NEGATIVE example (user rejected this response).\nYour task: Evaluate the generated trajectory in isolation.\nThe generated response should AVOID the issues mentioned in the user feedback.",
+      comparison_positive:
+        "Compare the generated trajectory to the gold trajectory. It should be at least as good.",
+      comparison_negative:
+        "Check if the generated trajectory avoids the issues mentioned in the negative feedback.",
+    };
+  }
 }
 
 /**
- * Metric 1: Efficiency Evaluation
- * Compares two trajectories that reach the same solution, scoring based on:
- * - Number of steps (assistant turns)
- * - Number of tool calls
- * Returns positive score if predicted is more efficient, negative if less efficient
+ * Judge and score a sample using the reflection model
+ * This is the core evaluation function for the redesigned GEPA algorithm
  */
-export async function evaluateEfficiency(
-  goldTrajectory: Trajectory,
-  predictedTrajectory: Trajectory
-): Promise<EfficiencyMetricResult> {
-  const prompt = `You are an expert evaluator assessing agent trajectory efficiency.
+export async function judgeAndScoreSample(
+  sample: Trajectory,
+  generatedTrajectory: Trajectory,
+  reflectionModel: string,
+  selectedMetrics: readonly string[]
+): Promise<{
+  metrics: {
+    tone?: number;
+    accuracy?: number;
+    efficiency?: number;
+    tool_accuracy?: number;
+    guardrails?: number;
+    [key: string]: number | undefined;
+  };
+  overallScore: number;
+  detailedFeedback: string;
+  suggestedImprovements: string;
+}> {
+  // Load metrics prompts configuration
+  const config = await loadMetricsPrompts();
 
-ASSUMPTION: Both trajectories reach the SAME correct solution.
+  const isPositiveFeedback = sample.feedback?.rating === "positive";
+  const feedbackComment = sample.feedback?.comment || "No feedback provided";
 
-GOLD TRAJECTORY (Reference):
-${JSON.stringify(goldTrajectory, null, 2)}
+  // Build judgment prompt using config
+  const comparisonContext = isPositiveFeedback
+    ? config.positive_feedback_instruction
+    : config.negative_feedback_instruction;
 
-PREDICTED TRAJECTORY (To Evaluate):
-${JSON.stringify(predictedTrajectory, null, 2)}
+  // Build dimension descriptions from config
+  const dimensionDescriptions = Object.entries(config.dimensions)
+    .map(
+      ([_key, dim], index) =>
+        `${index + 1}. **${dim.name}**: ${dim.description}`
+    )
+    .join("\n");
 
-TASK: Compare the efficiency of both trajectories based on:
-1. Number of steps (assistant message turns)
-2. Number of tool calls made
-3. Overall efficiency in reaching the solution
+  const comparisonInstruction = isPositiveFeedback
+    ? config.comparison_positive
+    : config.comparison_negative;
 
-SCORING GUIDELINES:
-- Positive score: Predicted is MORE efficient (fewer steps/tool calls)
-- Negative score: Predicted is LESS efficient (more steps/tool calls)
-- Zero score: Both are equally efficient
-- Magnitude should reflect the degree of difference (e.g., +2 for significantly more efficient, -1 for slightly less efficient)
+  const judgmentPrompt = `${config.evaluation_instructions}
 
-Count the steps and tool calls carefully, then provide:
-1. Exact counts for both trajectories
-2. An efficiency ratio
-3. A score reflecting the efficiency comparison
-4. Feedback explaining which trajectory is more efficient and why`;
+CONTEXT:
+${comparisonContext}
 
-  const result = await generateObject({
-    model: JUDGE_MODEL,
-    schema: EfficiencyMetricSchema,
-    prompt,
-  });
-
-  return result.object;
-}
-
-/**
- * Helper function to extract metrics from a trajectory
- */
-export function extractTrajectoryStats(trajectory: Trajectory): {
-  steps: number;
-  toolCalls: number;
-} {
-  let steps = 0;
-  let toolCalls = 0;
-
-  for (const message of trajectory.messages) {
-    if (message.role === "assistant") {
-      steps++;
-      if (Array.isArray(message.content)) {
-        toolCalls += message.content.filter(
-          (p) => p.type === "tool-call"
-        ).length;
-      }
-    }
+USER FEEDBACK: "${feedbackComment}"
+Feedback Type: ${
+    isPositiveFeedback ? "POSITIVE (approved)" : "NEGATIVE (rejected)"
   }
 
-  return { steps, toolCalls };
+SAMPLE TRAJECTORY (Reference):
+${JSON.stringify(sample.messages, null, 2)}
+
+GENERATED TRAJECTORY (To Evaluate):
+${JSON.stringify(generatedTrajectory.messages, null, 2)}
+
+EVALUATION DIMENSIONS:
+${selectedMetrics.map((m) => `- ${m}`).join("\n")}
+
+Evaluate the generated trajectory across ALL 5 dimensions:
+${dimensionDescriptions}
+
+${comparisonInstruction}
+
+Provide scores (0-1), detailed feedback, and specific improvement suggestions for the prompt.`;
+
+  try {
+    const result = await generateObject({
+      model: reflectionModel,
+      schema: ReflectionScoreSchema,
+      prompt: judgmentPrompt,
+    });
+
+    const score = result.object;
+
+    return {
+      metrics: {
+        tone: score.tone,
+        accuracy: score.accuracy,
+        efficiency: score.efficiency,
+        tool_accuracy: score.tool_accuracy,
+        guardrails: score.guardrails,
+      },
+      overallScore: score.overall_score,
+      detailedFeedback: score.detailed_feedback,
+      suggestedImprovements: score.suggested_improvements,
+    };
+  } catch (error) {
+    console.error("[Judge] Error evaluating sample:", error);
+    // Return neutral scores on error
+    return {
+      metrics: {
+        tone: 0.5,
+        accuracy: 0.5,
+        efficiency: 0.5,
+        tool_accuracy: 0.5,
+        guardrails: 0.5,
+      },
+      overallScore: 0.5,
+      detailedFeedback: `Evaluation failed: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`,
+      suggestedImprovements:
+        "Unable to generate suggestions due to evaluation error.",
+    };
+  }
 }

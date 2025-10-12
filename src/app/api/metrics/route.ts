@@ -1,10 +1,4 @@
-import {
-  evaluateAccuracy,
-  evaluateEfficiency,
-  type AccuracyMetricResult,
-  type EfficiencyMetricResult,
-  type Trajectory,
-} from "@/lib/metrics";
+import { judgeAndScoreSample, type Trajectory } from "@/lib/metrics";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -41,41 +35,27 @@ const TrajectorySchema = z.object({
     .optional(),
 });
 
-const AccuracyRequestSchema = z.object({
-  metric: z.literal("accuracy"),
-  goldTrajectory: TrajectorySchema,
-  predictedTrajectory: TrajectorySchema,
-});
-
-const EfficiencyRequestSchema = z.object({
-  metric: z.literal("efficiency"),
-  goldTrajectory: TrajectorySchema,
-  predictedTrajectory: TrajectorySchema,
+const EvaluateRequestSchema = z.object({
+  sampleTrajectory: TrajectorySchema,
+  generatedTrajectory: TrajectorySchema,
+  reflectionModel: z.string().default("openai/gpt-4o"),
+  selectedMetrics: z
+    .array(z.string())
+    .default(["tone", "accuracy", "efficiency", "tool_accuracy", "guardrails"]),
 });
 
 const BatchRequestSchema = z.object({
-  metric: z.literal("batch"),
   evaluations: z.array(
-    z.union([
-      AccuracyRequestSchema.omit({ metric: true }).extend({
-        type: z.literal("accuracy"),
-        id: z.string().optional(),
-      }),
-      EfficiencyRequestSchema.omit({ metric: true }).extend({
-        type: z.literal("efficiency"),
-        id: z.string().optional(),
-      }),
-    ])
+    EvaluateRequestSchema.extend({
+      id: z.string().optional(),
+    })
   ),
 });
 
 const MetricRequestSchema = z.union([
-  AccuracyRequestSchema,
-  EfficiencyRequestSchema,
+  EvaluateRequestSchema,
   BatchRequestSchema,
 ]);
-
-type MetricRequest = z.infer<typeof MetricRequestSchema>;
 
 export async function POST(req: Request) {
   try {
@@ -97,75 +77,25 @@ export async function POST(req: Request) {
 
     const request = parsed.data;
 
-    // Handle single metric evaluation
-    if (request.metric === "accuracy") {
-      const result: AccuracyMetricResult = await evaluateAccuracy(
-        request.goldTrajectory as Trajectory,
-        request.predictedTrajectory as Trajectory
-      );
-
-      return new Response(
-        JSON.stringify({
-          metric: "accuracy",
-          result,
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    if (request.metric === "efficiency") {
-      const result: EfficiencyMetricResult = await evaluateEfficiency(
-        request.goldTrajectory as Trajectory,
-        request.predictedTrajectory as Trajectory
-      );
-
-      return new Response(
-        JSON.stringify({
-          metric: "efficiency",
-          result,
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-    }
-
     // Handle batch evaluations
-    if (request.metric === "batch") {
+    if ("evaluations" in request) {
       const results = await Promise.all(
         request.evaluations.map(async (evaluation) => {
           try {
-            if (evaluation.type === "accuracy") {
-              const result = await evaluateAccuracy(
-                evaluation.goldTrajectory as Trajectory,
-                evaluation.predictedTrajectory as Trajectory
-              );
-              return {
-                id: evaluation.id,
-                type: "accuracy" as const,
-                result,
-                error: null,
-              };
-            } else {
-              const result = await evaluateEfficiency(
-                evaluation.goldTrajectory as Trajectory,
-                evaluation.predictedTrajectory as Trajectory
-              );
-              return {
-                id: evaluation.id,
-                type: "efficiency" as const,
-                result,
-                error: null,
-              };
-            }
+            const result = await judgeAndScoreSample(
+              evaluation.sampleTrajectory as Trajectory,
+              evaluation.generatedTrajectory as Trajectory,
+              evaluation.reflectionModel,
+              evaluation.selectedMetrics
+            );
+            return {
+              id: evaluation.id,
+              result,
+              error: null,
+            };
           } catch (error) {
             return {
               id: evaluation.id,
-              type: evaluation.type,
               result: null,
               error: error instanceof Error ? error.message : "Unknown error",
             };
@@ -175,7 +105,6 @@ export async function POST(req: Request) {
 
       return new Response(
         JSON.stringify({
-          metric: "batch",
           results,
         }),
         {
@@ -185,12 +114,20 @@ export async function POST(req: Request) {
       );
     }
 
+    // Handle single evaluation
+    const result = await judgeAndScoreSample(
+      request.sampleTrajectory as Trajectory,
+      request.generatedTrajectory as Trajectory,
+      request.reflectionModel,
+      request.selectedMetrics
+    );
+
     return new Response(
       JSON.stringify({
-        error: "Invalid metric type",
+        result,
       }),
       {
-        status: 400,
+        status: 200,
         headers: { "Content-Type": "application/json" },
       }
     );

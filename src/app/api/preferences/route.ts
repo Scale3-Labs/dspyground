@@ -8,12 +8,26 @@ type Preferences = {
   selectedModel: string;
   isTeachingMode: boolean;
   useStructuredOutput: boolean;
+  // Optimizer settings
+  optimizationModel?: string;
+  reflectionModel?: string;
+  batchSize?: number;
+  numRollouts?: number;
+  selectedMetrics?: string[];
+  optimizeStructuredOutput?: boolean;
 };
 
 const DEFAULT_PREFERENCES: Preferences = {
   selectedModel: "openai/gpt-4.1-mini",
   isTeachingMode: false,
   useStructuredOutput: false,
+  // Optimizer defaults
+  optimizationModel: "openai/gpt-4.1-mini",
+  reflectionModel: "openai/gpt-4.1",
+  batchSize: 3,
+  numRollouts: 10,
+  selectedMetrics: ["accuracy"],
+  optimizeStructuredOutput: false,
 };
 
 // GET: Read preferences

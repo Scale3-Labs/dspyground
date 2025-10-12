@@ -90,8 +90,8 @@ export function PromptEditorDialog({
         <DialogHeader>
           <DialogTitle>Edit System Prompt</DialogTitle>
           <DialogDescription>
-            Edit the system prompt that guides the AI's behavior. Changes will
-            apply to new conversations.
+            Edit the system prompt that guides the AI&apos;s behavior. Changes
+            will apply to new conversations.
           </DialogDescription>
         </DialogHeader>
 

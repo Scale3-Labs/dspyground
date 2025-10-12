@@ -15,14 +15,14 @@ const ToolCallPartSchema = z.object({
   type: z.literal("tool-call"),
   toolCallId: z.string(),
   toolName: z.string(),
-  args: z.any(),
+  args: z.record(z.string(), z.unknown()),
 });
 
 const ToolResultPartSchema = z.object({
   type: z.literal("tool-result"),
   toolCallId: z.string(),
   toolName: z.string(),
-  result: z.any(),
+  result: z.unknown(),
   isError: z.boolean().optional(),
 });
 
@@ -66,8 +66,8 @@ function transformMessages(messages: UIMessage[]) {
     }
 
     // Separate parts by type
-    const textParts: any[] = [];
-    const toolUIParts: any[] = [];
+    const textParts: Array<{ type: string; text: string }> = [];
+    const toolUIParts: Array<{ type: string; [key: string]: unknown }> = [];
 
     for (const part of msg.parts) {
       if (part.type === "text") {
@@ -85,9 +85,9 @@ function transformMessages(messages: UIMessage[]) {
         content: [
           {
             type: "tool-call",
-            toolCallId: toolPart.toolCallId || "",
+            toolCallId: (toolPart.toolCallId as string) || "",
             toolName: toolPart.type.replace("tool-", ""),
-            args: toolPart.input || {},
+            args: (toolPart.input as Record<string, unknown>) || {},
           },
         ],
       });
@@ -102,7 +102,7 @@ function transformMessages(messages: UIMessage[]) {
           content: [
             {
               type: "tool-result",
-              toolCallId: toolPart.toolCallId || "",
+              toolCallId: (toolPart.toolCallId as string) || "",
               toolName: toolPart.type.replace("tool-", ""),
               result: toolPart.errorText || toolPart.output,
               isError: !!toolPart.errorText,
