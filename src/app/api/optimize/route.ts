@@ -17,7 +17,6 @@ export const maxDuration = 300; // 5 minutes for optimization
 interface OptimizeRequest {
   optimizationModel: string;
   reflectionModel: string;
-  trainValidationSplit: number; // Keep for backwards compatibility, but unused
   batchSize: number;
   numRollouts: number;
   selectedMetrics: MetricType[];

@@ -4,7 +4,6 @@
   "useStructuredOutput": false,
   "optimizationModel": "openai/gpt-4.1-mini",
   "reflectionModel": "openai/gpt-4.1",
-  "trainValidationSplit": 50,
   "batchSize": 2,
   "numRollouts": 5,
   "selectedMetrics": [

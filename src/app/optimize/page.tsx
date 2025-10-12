@@ -202,7 +202,6 @@ export default function OptimizePage() {
         body: JSON.stringify({
           optimizationModel,
           reflectionModel,
-          trainValidationSplit: 80, // Backwards compatibility (unused)
           batchSize,
           numRollouts,
           selectedMetrics,
