@@ -23,11 +23,12 @@ import {
 import { Response } from "@/components/ai-elements/response";
 import { Button } from "@/components/ui/button";
 import { FeedbackDialog } from "@/components/ui/feedback-dialog";
+import { PromptEditorDialog } from "@/components/ui/prompt-editor-dialog";
 import { Switch } from "@/components/ui/switch";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useChat, experimental_useObject as useObject } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { MessageSquare } from "lucide-react";
+import { FileText, MessageSquare } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -57,6 +58,7 @@ export default function Chat() {
   const [savingSample, setSavingSample] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState<string>("");
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
+  const [promptEditorOpen, setPromptEditorOpen] = useState(false);
 
   // Wrap setSelectedModel to prevent empty values
   const setSelectedModel = useCallback(
@@ -485,17 +487,29 @@ export default function Chat() {
                   </div>
                 )}
               </PromptInputTools>
-              <PromptInputSubmit
-                status={currentStatus === "streaming" ? "streaming" : "ready"}
-                onClick={
-                  currentStatus === "streaming"
-                    ? (e) => {
-                        e.preventDefault();
-                        handleStop();
-                      }
-                    : undefined
-                }
-              />
+              <div className="flex items-center gap-1 ml-auto">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPromptEditorOpen(true)}
+                  className="h-8"
+                  title="Edit system prompt"
+                >
+                  <FileText className="size-4" />
+                </Button>
+                <PromptInputSubmit
+                  status={currentStatus === "streaming" ? "streaming" : "ready"}
+                  onClick={
+                    currentStatus === "streaming"
+                      ? (e) => {
+                          e.preventDefault();
+                          handleStop();
+                        }
+                      : undefined
+                  }
+                />
+              </div>
             </PromptInputToolbar>
           </PromptInput>
         </div>
@@ -507,6 +521,12 @@ export default function Chat() {
         onOpenChange={setFeedbackDialogOpen}
         onSave={handleSaveWithFeedback}
         isSaving={savingSample}
+      />
+
+      {/* Prompt Editor Dialog */}
+      <PromptEditorDialog
+        open={promptEditorOpen}
+        onOpenChange={setPromptEditorOpen}
       />
     </div>
   );

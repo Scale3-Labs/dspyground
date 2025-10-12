@@ -11,7 +11,7 @@
     * Your Slack user ID: U09KHSG6T98
     * Details of the user you are interacting with:
       * The user's Slack user ID: U03P95DJVNJ
-      * The user's name: Karthik
+      * The user's name: Karthi
       * The user's email: karthik@scale3labs.com
       * The user's title: Cofounder
       * The user's profile picture: https://avatars.slack-edge.com/2024-02-15/6646784171810_47560361d06f6bcc32c5_original.jpg
