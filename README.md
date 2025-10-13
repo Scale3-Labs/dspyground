@@ -1,32 +1,47 @@
 # DSPyground
 
-Optimize ~~Engineer~~ your Prompts for better agent trajectories.
+An open-source prompt optimization harness powered by [GEPA](https://dspy.ai/api/optimizers/GEPA/overview/). Install directly into your existing [AI SDK](https://ai-sdk.dev/) agent repo, import your tools and prompts for 1:1 environment portability, and align agent behavior through iterative sampling and optimization—delivering an optimized prompt as your final artifact. Built for agentic loops.
 
-A portable playground for prompt optimization using a modified GEPA (Genetic-Pareto) algorithm with multi-dimensional metrics and real-time feedback. Works seamlessly with your existing AI SDK codebase.
+## Key Features
+
+- **Bootstrap with a Basic Prompt** — Start with any simple prompt—no complex setup required. DSPyground will help you evolve it into a production-ready system prompt.
+- **Port Your Agent Environment** — Use a simple config file to import your existing [AI SDK](https://ai-sdk.dev/) prompts and tools—seamlessly recreate your agent environment for optimization.
+- **Multi-Dimensional Metrics** — Optimize across 5 key dimensions: **Tone** (communication style), **Accuracy** (correctness), **Efficiency** (tool usage), **Tool Accuracy** (right tools), and **Guardrails** (safety compliance).
 
 ## Quick Start
 
 ### Prerequisites
+
 - Node.js 18+
-- AI Gateway API key (set `AI_GATEWAY_API_KEY` in your `.env` file)
-- An AI SDK project (recommended but not required)
+- [AI Gateway API key](https://vercel.com/docs/ai-gateway/getting-started) (create one in the AI Gateway dashboard)
 
-> **Note:** DSPyground bundles all required dependencies. If you already have `ai` and `zod` in your project, it will use your versions to avoid conflicts. Otherwise, it uses its bundled versions.
+### Installation
 
-### Installation & Setup
+```bash
+# Using npm
+npm install -g dspyground
+
+# Or using pnpm
+pnpm add -g dspyground
+```
+
+### Setup and Start
 
 ```bash
 # Initialize DSPyground in your project
-npx dspyground@latest init
+dspyground init
 
-# This creates:
-# - .dspyground/data/     (local data storage)
-# - dspyground.config.ts  (configuration file)
+# Start the dev server
+dspyground dev
 ```
+
+The app will open at `http://localhost:3000`.
+
+> **Note:** DSPyground bundles all required dependencies. If you already have `ai` and `zod` in your project, it will use your versions to avoid conflicts. Otherwise, it uses its bundled versions.
 
 ### Configuration
 
-Edit `dspyground.config.ts` to import your tools and customize your setup:
+Edit `dspyground.config.ts` to import your [AI SDK](https://ai-sdk.dev/) tools and customize your setup:
 
 ```typescript
 import { tool } from 'ai'
@@ -57,23 +72,19 @@ Create a `.env` file in your project root:
 AI_GATEWAY_API_KEY=your_api_key_here
 ```
 
-This API key will be used by DSPyGround to access AI models through AI Gateway.
-
-### Start the Dev Server
-
-```bash
-npx dspyground dev
-```
-
-The app runs at `http://localhost:3000`. No additional services needed—optimization runs entirely in-app.
+This API key will be used by DSPyground to access AI models through [AI Gateway](https://vercel.com/docs/ai-gateway/getting-started). Follow the [getting started guide](https://vercel.com/docs/ai-gateway/getting-started) to create your API key.
 
 **Note:** All data is stored locally in `.dspyground/data/` within your project. Add `.dspyground/` to your `.gitignore` (automatically done during init).
 
 ## How It Works
 
-DSPyground helps you systematically improve prompts through an iterative teach-optimize-test cycle:
+DSPyground follows a simple 3-step workflow:
 
-### 1. Teaching Mode: Collect Samples
+### 1. Install and Port Your Agent
+Install DSPyground in your repo and import your existing [AI SDK](https://ai-sdk.dev/) tools and prompts for 1:1 environment portability. Use `dspyground.config.ts` to configure your agent environment.
+
+### 2. Chat and Sample Trajectories
+Interact with your agent and collect trajectory samples that demonstrate your desired behavior:
 - **Start with a base prompt** in `.dspyground/data/prompt.md` (editable in UI)
 - **Enable Teaching Mode** and chat with the AI to create scenarios
 - **Save samples with feedback**: Click the + button to save conversation turns as test samples
@@ -81,8 +92,8 @@ DSPyground helps you systematically improve prompts through an iterative teach-o
   - Give **negative feedback** for bad responses (these guide what to avoid)
 - **Organize with Sample Groups**: Create groups like "Tone Tests", "Tool Usage", "Safety Tests"
 
-### 2. Optimization: Modified GEPA Algorithm
-Click "Optimize" to start the automated prompt improvement process. Here's what happens:
+### 3. Optimize
+Run [GEPA](https://dspy.ai/api/optimizers/GEPA/overview/) optimization to generate a refined prompt aligned with your sampled behaviors. Click "Optimize" to start the automated prompt improvement process.
 
 #### The Modified GEPA Algorithm
 Our implementation extends the traditional GEPA (Genetic-Pareto Evolutionary Algorithm) with several key modifications:
@@ -136,42 +147,27 @@ Our implementation extends the traditional GEPA (Genetic-Pareto Evolutionary Alg
   - Pareto frontier evolution
 - **View in History tab**: See score progression and prompt evolution
 
-## Features
+## Additional Features
 
-### Structured Output Mode
-Toggle between regular chat and structured output using the switch in the UI.
-
-**JSON Schema Mode:**
-- Edit `.dspyground/data/schema.json` to define your output structure
-- AI returns responses matching your schema
-- Use cases: data extraction, classification, form filling, structured analysis
-
-### Custom Tools
-- Import your tools in `dspyground.config.ts`
-- All tools from your config are automatically available
-- Works with any AI SDK tool from your existing codebase
-- Example tools included in the template
-
-### Sample Groups
-- Organize samples by use case or test category
-- Switch groups during optimization to test different scenarios
-- Each group maintains its own set of samples with feedback
+- **Structured Output Mode** — Toggle between regular chat and structured output. Edit `.dspyground/data/schema.json` to define your output structure for data extraction, classification, and more.
+- **Custom Tools** — Import your tools in `dspyground.config.ts`. Works with any [AI SDK](https://ai-sdk.dev/) tool from your existing codebase.
+- **Sample Groups** — Organize samples by use case or test category. Switch groups during optimization to test different scenarios.
 
 ## Architecture
 
-**Frontend**: Next.js with AI SDK (`ai` package)
+**Frontend**: Next.js with [AI SDK](https://ai-sdk.dev/) (`ai` package)
 - Real-time streaming with `useChat` and `useObject` hooks
 - Server-sent events for optimization progress
 - shadcn/ui component library
 
 **Backend**: Next.js API routes
 - `/api/chat` - Text and structured chat endpoints
-- `/api/optimize` - GEPA optimization with streaming progress
+- `/api/optimize` - [GEPA](https://dspy.ai/api/optimizers/GEPA/overview/) optimization with streaming progress
 - `/api/samples`, `/api/runs` - Data persistence
 - `/api/metrics-prompt` - Configurable metrics
 
-**Optimization Engine**: Hybrid TypeScript + Python implementation
-- TypeScript GEPA algorithm in `src/app/api/optimize/route.ts`
+**Optimization Engine**: TypeScript implementation
+- GEPA algorithm in `src/app/api/optimize/route.ts`
 - Reflection-based scoring in `src/lib/metrics.ts`
 
 ## Local Data Files
@@ -188,15 +184,14 @@ All data is stored locally in your project:
 
 ## Learn More
 
-**DSPy & GEPA:**
+**GEPA:**
+- [GEPA Optimizer](https://dspy.ai/api/optimizers/GEPA/overview/) — Genetic-Pareto optimization algorithm
 - [DSPy Documentation](https://dspy.ai/) — Prompt optimization framework
-- [GEPA Optimizer](https://dspy.ai/api/optimizers/GEPA/) — Genetic-Pareto optimization
-- [GEPA Tweet](https://x.com/LakshyAAAgrawal/status/1949867953421496715) — Original announcement
 - [GEPA Paper](https://arxiv.org/pdf/2507.19457) — Academic research
 
 **AI SDK:**
-- [Vercel AI SDK](https://sdk.vercel.ai/docs) — Streaming and tool calling
-- [streamObject](https://sdk.vercel.ai/docs/reference/ai-sdk-core/stream-object) — Structured output
+- [AI SDK](https://ai-sdk.dev/) — The AI Toolkit for TypeScript
+- [AI SDK Docs](https://ai-sdk.dev/docs) — Streaming, tool calling, and structured output
 
 ## About
 Built by the team that built [Langtrace AI](https://langtrace.ai) and [Zest AI](https://heyzest.ai).

@@ -7,16 +7,32 @@ export default function Home() {
       <div className="container mx-auto px-4 py-16 max-w-6xl">
         {/* Hero Section */}
         <div className="text-center mb-16">
-          <div className="inline-flex items-center px-3 py-1 rounded-full bg-muted text-muted-foreground text-sm mb-6">
-            Fully Open Source • Powered by DSPy, GEPA, and AISDK
-          </div>
           <h1 className="text-5xl font-bold text-foreground mb-6">
             DSPyground
           </h1>
           <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-            Optimize your prompts for better agent trajectories. Teach your AI,
-            collect ideal samples, and generate optimized prompts using the
-            powerful DSPy, GEPA, and AISDK.
+            An open-source prompt optimization harness powered by{" "}
+            <a
+              href="https://dspy.ai/api/optimizers/GEPA/overview/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-foreground hover:text-primary underline transition-colors"
+            >
+              GEPA
+            </a>
+            . Install directly into your existing{" "}
+            <a
+              href="https://ai-sdk.dev/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-foreground hover:text-primary underline transition-colors"
+            >
+              AI SDK
+            </a>{" "}
+            agent repo, import your tools and prompts for 1:1 environment
+            portability, and align agent behavior through iterative sampling and
+            optimization—delivering an optimized prompt as your final artifact.
+            Built for agentic loops.
           </p>
           <div className="flex justify-center">
             <Link href="/chat">
@@ -41,66 +57,79 @@ export default function Home() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                />
-              </svg>
-            </div>
-            <h3 className="text-xl font-semibold mb-2 text-foreground">
-              Teach Your AI
-            </h3>
-            <p className="text-muted-foreground">
-              Guide your AI through interactive conversations and demonstrate
-              the ideal responses you want to achieve.
-            </p>
-          </div>
-
-          <div className="border rounded-lg p-6">
-            <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center mb-4">
-              <svg
-                className="w-6 h-6 text-foreground"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            <h3 className="text-xl font-semibold mb-2 text-foreground">
-              Collect Ideal Samples
-            </h3>
-            <p className="text-muted-foreground">
-              Gather high-quality conversation examples that represent the
-              perfect AI behavior for your use case.
-            </p>
-          </div>
-
-          <div className="border rounded-lg p-6">
-            <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center mb-4">
-              <svg
-                className="w-6 h-6 text-foreground"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
                   d="M13 10V3L4 14h7v7l9-11h-7z"
                 />
               </svg>
             </div>
             <h3 className="text-xl font-semibold mb-2 text-foreground">
-              DSPy, GEPA, and AISDK
+              Bootstrap with a Basic Prompt
             </h3>
             <p className="text-muted-foreground">
-              Leverage advanced optimization algorithms to automatically
-              generate and refine prompt candidates.
+              Start with any simple prompt—no complex setup required. DSPyground
+              will help you evolve it into a production-ready system prompt.
+            </p>
+          </div>
+
+          <div className="border rounded-lg p-6">
+            <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center mb-4">
+              <svg
+                className="w-6 h-6 text-foreground"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold mb-2 text-foreground">
+              Port Your Agent Environment
+            </h3>
+            <p className="text-muted-foreground">
+              Use a simple config file to import your existing{" "}
+              <a
+                href="https://ai-sdk.dev/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-foreground hover:text-primary underline transition-colors"
+              >
+                AI SDK
+              </a>{" "}
+              prompts and tools—seamlessly recreate your agent environment for
+              optimization.
+            </p>
+          </div>
+
+          <div className="border rounded-lg p-6">
+            <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center mb-4">
+              <svg
+                className="w-6 h-6 text-foreground"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold mb-2 text-foreground">
+              Multi-Dimensional Metrics
+            </h3>
+            <p className="text-muted-foreground">
+              Optimize across 5 key dimensions: <strong>Tone</strong>{" "}
+              (communication style),
+              <strong>Accuracy</strong> (correctness),{" "}
+              <strong>Efficiency</strong> (tool usage),
+              <strong>Tool Accuracy</strong> (right tools), and{" "}
+              <strong>Guardrails</strong> (safety compliance).
             </p>
           </div>
         </div>
@@ -110,17 +139,25 @@ export default function Home() {
           <h2 className="text-3xl font-bold text-center mb-8 text-foreground">
             How It Works
           </h2>
-          <div className="grid md:grid-cols-4 gap-6">
+          <div className="grid md:grid-cols-3 gap-8">
             <div className="text-center">
               <div className="w-16 h-16 bg-foreground text-background rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">
                 1
               </div>
               <h4 className="font-semibold mb-2 text-foreground">
-                Start Conversation
+                Install and Port Your Agent
               </h4>
               <p className="text-sm text-muted-foreground">
-                Begin chatting with the AI and teach it desired behaviors
-                through examples
+                Install DSPyground in your repo and import your existing{" "}
+                <a
+                  href="https://ai-sdk.dev/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-foreground hover:text-primary underline transition-colors"
+                >
+                  AI SDK
+                </a>{" "}
+                tools and prompts for 1:1 environment portability
               </p>
             </div>
             <div className="text-center">
@@ -128,33 +165,30 @@ export default function Home() {
                 2
               </div>
               <h4 className="font-semibold mb-2 text-foreground">
-                Mark Examples
+                Chat and Sample Trajectories
               </h4>
               <p className="text-sm text-muted-foreground">
-                Save ideal conversation samples that represent perfect responses
+                Interact with your agent and collect trajectory samples that
+                demonstrate your desired behavior
               </p>
             </div>
             <div className="text-center">
               <div className="w-16 h-16 bg-foreground text-background rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">
                 3
               </div>
-              <h4 className="font-semibold mb-2 text-foreground">
-                Run Optimization
-              </h4>
+              <h4 className="font-semibold mb-2 text-foreground">Optimize</h4>
               <p className="text-sm text-muted-foreground">
-                Let DSPy, GEPA, and AISDK analyze patterns and generate
-                optimized prompts
-              </p>
-            </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-foreground text-background rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">
-                4
-              </div>
-              <h4 className="font-semibold mb-2 text-foreground">
-                Deploy Results
-              </h4>
-              <p className="text-sm text-muted-foreground">
-                Use the optimized prompts in your applications
+                Run{" "}
+                <a
+                  href="https://dspy.ai/api/optimizers/GEPA/overview/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-foreground hover:text-primary underline transition-colors"
+                >
+                  GEPA
+                </a>{" "}
+                optimization to generate a refined prompt aligned with your
+                sampled behaviors
               </p>
             </div>
           </div>
@@ -235,80 +269,45 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Local Development Setup */}
+        {/* Installation */}
         <div className="border rounded-lg p-8">
           <h2 className="text-2xl font-bold mb-6 text-foreground">
-            🚀 Run Locally
+            🚀 Get Started
           </h2>
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div>
-              <h3 className="text-lg font-semibold mb-2 text-foreground">
-                Prerequisites
-              </h3>
-              <p className="text-muted-foreground mb-2">
-                Make sure you have Node.js and uv installed on your system.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-semibold mb-2 text-foreground">
-                Quick Start
+              <h3 className="text-lg font-semibold mb-3 text-foreground">
+                Install
               </h3>
               <div className="bg-muted rounded-lg p-4 overflow-x-auto">
                 <pre className="text-foreground text-sm">
-                  {`# Clone the repository
-git clone https://github.com/Scale3-Labs/aisdk-prompt-optimizer
-cd aisdk-prompt-optimizer
+                  {`# Using npm
+npm install -g dspyground
 
-# Install dependencies
-npm install
-
-# Start both services (recommended)
-npm run dev:all
-
-# Or start them separately:
-# Terminal 1: Start the Python optimizer
-cd python_optimizer
-uv run app.py
-
-# Terminal 2: Start the web app
-npm run dev`}
+# Or using pnpm
+pnpm add -g dspyground`}
                 </pre>
               </div>
             </div>
 
             <div>
-              <h3 className="text-lg font-semibold mb-2 text-foreground">
-                Available Scripts
+              <h3 className="text-lg font-semibold mb-3 text-foreground">
+                Start
               </h3>
-              <ul className="space-y-2 text-muted-foreground">
-                <li>
-                  <code className="bg-muted px-2 py-1 rounded text-sm">
-                    npm run dev
-                  </code>{" "}
-                  - Start the Next.js development server
-                </li>
-                <li>
-                  <code className="bg-muted px-2 py-1 rounded text-sm">
-                    npm run dev:py
-                  </code>{" "}
-                  - Start the Python optimizer server
-                </li>
-                <li>
-                  <code className="bg-muted px-2 py-1 rounded text-sm">
-                    npm run dev:all
-                  </code>{" "}
-                  - Start both services concurrently
-                </li>
-              </ul>
+              <div className="bg-muted rounded-lg p-4 overflow-x-auto">
+                <pre className="text-foreground text-sm">
+                  {`# Initialize and start DSPyground
+dspyground init
+dspyground dev`}
+                </pre>
+              </div>
             </div>
 
             <div className="bg-muted border rounded-lg p-4">
               <p className="text-muted-foreground text-sm">
-                <strong>💡 Tip:</strong> The web app runs on{" "}
-                <code>http://localhost:3000</code> and the Python optimizer on{" "}
-                <code>http://localhost:8000</code>. Both services need to be
-                running for the optimization features to work.
+                <strong>💡 Tip:</strong> The app will open at{" "}
+                <code>http://localhost:3000</code>. Make sure you have Node.js
+                installed on your system.
               </p>
             </div>
           </div>
