@@ -9,7 +9,9 @@ A portable playground for prompt optimization using a modified GEPA (Genetic-Par
 ### Prerequisites
 - Node.js 18+
 - AI Gateway API key (set `AI_GATEWAY_API_KEY` in your `.env` file)
-- An existing AI SDK project (or start a new one)
+- An AI SDK project (recommended but not required)
+
+> **Note:** DSPyground bundles all required dependencies. If you already have `ai` and `zod` in your project, it will use your versions to avoid conflicts. Otherwise, it uses its bundled versions.
 
 ### Installation & Setup
 

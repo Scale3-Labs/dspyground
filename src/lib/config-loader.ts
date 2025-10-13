@@ -1,5 +1,4 @@
 import path from "path";
-import { pathToFileURL } from "url";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ToolDefinition = any; // AI SDK tool type - using any to allow user's custom tools
@@ -32,12 +31,23 @@ export async function loadUserConfig(): Promise<DspygroundConfig> {
 
     console.log("🔍 Looking for config at:", configPath);
 
-    // Try to import the config
-    // Use pathToFileURL to handle Windows paths correctly
-    const configUrl = pathToFileURL(configPath).href;
+    // Check if file exists
+    const fs = await import("fs");
+    if (!fs.existsSync(configPath)) {
+      console.warn("⚠️  Config file not found, using defaults");
+      cachedConfig = defaultConfig;
+      return defaultConfig;
+    }
 
-    // Dynamic import with cache busting
-    const configModule = await import(`${configUrl}?t=${Date.now()}`);
+    // Use jiti to load TypeScript config
+    // jiti can handle both .ts and .js files
+    const { createJiti } = await import("jiti");
+    const jiti = createJiti(__filename, {
+      interopDefault: true,
+    });
+
+    // Load the config using jiti
+    const configModule = jiti(configPath);
     const userConfig = configModule.default || configModule;
 
     console.log("✅ Loaded user config successfully");

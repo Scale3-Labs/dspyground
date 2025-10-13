@@ -67,40 +67,55 @@ export async function devCommand() {
     // __dirname is dist/cli, so package root is ../..
     const packageRoot = path.join(__dirname, "..", "..");
 
-    // Check if we're in development (has src/) or production (has .next/)
-    const hasSrc = await fs
-      .access(path.join(packageRoot, "src"))
+    // Check for standalone server (production) or src (development)
+    const standaloneServer = path.join(
+      packageRoot,
+      ".next",
+      "standalone",
+      "work",
+      "dspyground",
+      "server.js"
+    );
+    const hasStandalone = await fs
+      .access(standaloneServer)
       .then(() => true)
       .catch(() => false);
-    const hasNext = await fs
-      .access(path.join(packageRoot, ".next"))
+
+    const hasSrc = await fs
+      .access(path.join(packageRoot, "src"))
       .then(() => true)
       .catch(() => false);
 
     let command: string;
     let args: string[];
+    let workingDir: string;
 
-    if (hasSrc && !hasNext) {
-      // Development mode: run next dev from package root
+    if (hasStandalone) {
+      // Production mode: run the standalone server
+      console.log("🚀 Running production server\n");
+      command = "node";
+      args = [standaloneServer];
+      workingDir = path.dirname(standaloneServer);
+    } else if (hasSrc) {
+      // Development mode: run next dev (for local development)
       console.log("🔧 Running in development mode\n");
       command = "npx";
       args = ["next", "dev", "-p", port.toString()];
-    } else if (hasNext) {
-      // Production mode: run next start (works with standalone)
-      console.log("🚀 Running in production mode\n");
-      command = "npx";
-      args = ["next", "start", "-p", port.toString()];
+      workingDir = packageRoot;
     } else {
-      throw new Error("Could not find Next.js app in dspyground package");
+      throw new Error(
+        "Could not find Next.js app in dspyground package. Package may be corrupted."
+      );
     }
 
     const child = spawn(command, args, {
-      cwd: packageRoot,
+      cwd: workingDir,
       stdio: "inherit",
       env: {
         ...process.env,
-        NODE_ENV: hasNext && !hasSrc ? "production" : "development",
+        NODE_ENV: hasStandalone ? "production" : "development",
         PORT: port.toString(),
+        HOSTNAME: "0.0.0.0",
       },
     });
 
