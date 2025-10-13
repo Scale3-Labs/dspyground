@@ -5,6 +5,9 @@
 .env.*
 !.env.example
 
+# Development data directory (not needed in published package)
+data/
+
 # Development files
 .vscode/
 .idea/
