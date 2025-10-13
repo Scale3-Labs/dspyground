@@ -234,8 +234,8 @@ pnpm add -g dspyground`}
               <div className="bg-muted rounded-lg p-4 overflow-x-auto">
                 <pre className="text-foreground text-sm">
                   {`# Initialize and start DSPyground
-dspyground init
-dspyground dev`}
+npx dspyground init
+npx dspyground dev`}
                 </pre>
               </div>
             </div>

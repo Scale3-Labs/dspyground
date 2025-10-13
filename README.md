@@ -29,10 +29,10 @@ pnpm add -g dspyground
 
 ```bash
 # Initialize DSPyground in your project
-dspyground init
+npx dspyground init
 
 # Start the dev server
-dspyground dev
+npx dspyground dev
 ```
 
 The app will open at `http://localhost:3000`.
