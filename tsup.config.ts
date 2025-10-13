@@ -14,7 +14,7 @@ export default defineConfig({
   target: "node18",
   shims: true,
   treeshake: true,
-  tsconfig: "tsconfig.json",
+  tsconfig: "tsconfig.cli.json",
   skipNodeModulesBundle: true,
   onSuccess: async () => {
     const fs = await import("fs");

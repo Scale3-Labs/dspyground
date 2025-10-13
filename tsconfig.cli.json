@@ -1,0 +1,26 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "target": "ES2020",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "strict": true,
+        "resolveJsonModule": true,
+        "isolatedModules": true,
+        "noEmit": false,
+        "outDir": "dist/cli",
+        "declaration": true,
+        "declarationMap": true,
+        "forceConsistentCasingInFileNames": true,
+        "incremental": false
+    },
+    "include": [
+        "cli/**/*"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist"
+    ]
+}
