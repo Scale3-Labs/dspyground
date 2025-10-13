@@ -552,6 +552,10 @@ async function runGEPA(
     status: "running",
   };
 
+  // Save run immediately so it shows up in the Runs page
+  await saveRun(run);
+  console.log(`[GEPA] Run ${runId} saved to runs.json`);
+
   await sendProgress({
     type: "start",
     iteration: 0,

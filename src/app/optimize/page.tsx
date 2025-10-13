@@ -171,6 +171,146 @@ export default function OptimizePage() {
     })();
   }, [restoreOptimizationState]);
 
+  // Cleanup: abort fetch when navigating away
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        console.log("[Optimize Page] Unmounting, aborting fetch");
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  // Poll for running optimization updates when not actively streaming
+  useEffect(() => {
+    if (isOptimizing || !currentRunId) return;
+
+    console.log("[Optimize Page] Polling for run updates:", currentRunId);
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await fetch("/api/runs", { cache: "no-store" });
+        if (response.ok) {
+          const data = await response.json();
+          const run = data.runs.find((r: any) => r.id === currentRunId);
+
+          if (run) {
+            console.log(
+              `[Optimize Page] Run ${currentRunId} status:`,
+              run.status,
+              "Best score:",
+              run.bestScore
+            );
+
+            // Update chart data from run data
+            if (run.prompts && run.prompts.length > 0) {
+              const newChartData: ChartPoint[] = run.prompts.map((p: any) => ({
+                iteration: p.iteration,
+                selected: p.score,
+                best: run.bestScore,
+                prompt: p.prompt,
+              }));
+              setChartData(newChartData);
+
+              // Update stream logs to show progress
+              const newStreamLogs: StreamLogEntry[] = [
+                {
+                  type: "evaluation",
+                  content:
+                    "⚠️ Reconnected to running optimization. Showing summary view (detailed sample logs only available during live streaming).",
+                  timestamp: Date.now(),
+                },
+              ];
+
+              run.prompts.forEach((p: any) => {
+                newStreamLogs.push({
+                  type: "iteration_start",
+                  iteration: p.iteration,
+                  timestamp: Date.now(),
+                });
+
+                // Add summary for each iteration
+                const statusEmoji = p.accepted ? "✅" : "❌";
+                const status = p.accepted ? "Accepted" : "Rejected";
+                newStreamLogs.push({
+                  type: "evaluation",
+                  iteration: p.iteration,
+                  content: `${statusEmoji} ${status} | Score: ${p.score.toFixed(
+                    2
+                  )} | Metrics: ${Object.entries(p.metrics || {})
+                    .map(
+                      ([key, val]) =>
+                        `${key}=${
+                          typeof val === "number" ? val.toFixed(2) : val
+                        }`
+                    )
+                    .join(", ")}`,
+                  timestamp: Date.now(),
+                });
+
+                if (p.accepted) {
+                  newStreamLogs.push({
+                    type: "iteration_end",
+                    iteration: p.iteration,
+                    prompt: p.prompt,
+                    timestamp: Date.now(),
+                  });
+                }
+              });
+
+              // Add current status message
+              if (run.status === "running") {
+                newStreamLogs.push({
+                  type: "evaluation",
+                  content: `\n📊 Current Progress: Iteration ${
+                    run.prompts.length - 1
+                  }/${
+                    run.config.numRollouts
+                  } | Best Score: ${run.bestScore.toFixed(
+                    2
+                  )} | Collection Size: ${
+                    run.collectionSize
+                  }\n\n⏳ Optimization running... (refreshing every 2s)`,
+                  timestamp: Date.now(),
+                });
+              }
+
+              setStreamLogs(newStreamLogs);
+            }
+
+            if (run.status === "completed") {
+              setFinalPrompt(run.finalPrompt);
+
+              // Add completion to stream logs
+              setStreamLogs((prev) => [
+                ...prev,
+                {
+                  type: "final",
+                  prompt: run.finalPrompt,
+                  timestamp: Date.now(),
+                },
+              ]);
+
+              toast.success("Optimization completed!");
+              clearInterval(pollInterval);
+              localStorage.removeItem("optimizationState");
+              setCurrentRunId(null);
+            } else if (run.status === "error") {
+              toast.error("Optimization encountered an error");
+              clearInterval(pollInterval);
+              localStorage.removeItem("optimizationState");
+              setCurrentRunId(null);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Failed to poll run status:", error);
+      }
+    }, 2000); // Poll every 2 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [currentRunId, isOptimizing]);
+
   // Load preferences on mount
   useEffect(() => {
     (async () => {
@@ -867,7 +1007,7 @@ export default function OptimizePage() {
                   <h2 className="text-lg font-semibold">Live Stream</h2>
                   {currentRunId && !isOptimizing && (
                     <span className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded">
-                      Viewing previous run
+                      Viewing current run
                     </span>
                   )}
                 </div>

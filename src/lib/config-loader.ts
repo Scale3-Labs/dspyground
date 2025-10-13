@@ -86,7 +86,7 @@ export function getDataDirectory(): string {
   if (fs.existsSync(userDataDir)) {
     return userDataDir;
   } else if (fs.existsSync(devDataDir)) {
-    console.log("⚠️  Using legacy data/ directory for development");
+    console.log("⚠️  Using data/ directory for development");
     return devDataDir;
   }
 

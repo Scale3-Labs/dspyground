@@ -5,10 +5,10 @@
   "optimizationModel": "openai/gpt-4.1-mini",
   "reflectionModel": "openai/gpt-4.1",
   "batchSize": 2,
-  "numRollouts": 3,
+  "numRollouts": 4,
   "selectedMetrics": [
     "accuracy",
-    "tool_accuracy"
+    "tone"
   ],
   "optimizeStructuredOutput": false
 }
