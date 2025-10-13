@@ -274,6 +274,83 @@ export default function HowToPage() {
             </div>
           </section>
 
+          <Separator />
+
+          {/* Keyboard Shortcuts */}
+          <section>
+            <h3 className="text-xl font-semibold mb-4">
+              ⌨️ Keyboard Shortcuts
+            </h3>
+            <p className="text-muted-foreground mb-4">
+              Speed up your workflow with these keyboard shortcuts available in
+              the Chat page:
+            </p>
+            <div className="grid gap-3">
+              <div className="flex items-center justify-between border rounded-lg p-4">
+                <div>
+                  <h4 className="font-medium">Open Sample Dialog</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Open the feedback dialog to save conversation as a sample
+                  </p>
+                </div>
+                <kbd className="px-3 py-1.5 text-sm font-semibold text-foreground bg-muted border border-border rounded">
+                  ⌘ A
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between border rounded-lg p-4">
+                <div>
+                  <h4 className="font-medium">Save Sample</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Save the sample after selecting rating (in feedback dialog)
+                  </p>
+                </div>
+                <kbd className="px-3 py-1.5 text-sm font-semibold text-foreground bg-muted border border-border rounded">
+                  ⌘ S
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between border rounded-lg p-4">
+                <div>
+                  <h4 className="font-medium">Clear Chat</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Clear the current conversation
+                  </p>
+                </div>
+                <kbd className="px-3 py-1.5 text-sm font-semibold text-foreground bg-muted border border-border rounded">
+                  ⌘ C
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between border rounded-lg p-4">
+                <div>
+                  <h4 className="font-medium">Thumbs Up (Positive Feedback)</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Open feedback dialog with positive rating pre-selected
+                  </p>
+                </div>
+                <kbd className="px-3 py-1.5 text-sm font-semibold text-foreground bg-muted border border-border rounded">
+                  ↑
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between border rounded-lg p-4">
+                <div>
+                  <h4 className="font-medium">
+                    Thumbs Down (Negative Feedback)
+                  </h4>
+                  <p className="text-sm text-muted-foreground">
+                    Open feedback dialog with negative rating pre-selected
+                  </p>
+                </div>
+                <kbd className="px-3 py-1.5 text-sm font-semibold text-foreground bg-muted border border-border rounded">
+                  ↓
+                </kbd>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-4">
+              <strong>Note:</strong> Use Cmd (⌘) on Mac or Ctrl on
+              Windows/Linux. Arrow key shortcuts are disabled when typing in
+              input fields or text areas.
+            </p>
+          </section>
+
           {/* CTA */}
           <div className="text-center pt-8">
             <Link href="/chat">

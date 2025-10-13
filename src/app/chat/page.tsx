@@ -379,6 +379,75 @@ export default function Chat() {
     loadSchema();
   }, []);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+      const modifierKey = isMac ? e.metaKey : e.ctrlKey;
+
+      // Cmd/Ctrl + A for sampling (add sample)
+      if (e.key === "a" && modifierKey) {
+        e.preventDefault();
+        const canSample =
+          (useStructuredOutput && object) ||
+          (!useStructuredOutput && messages.length >= 2);
+        if (canSample && !savingSample) {
+          handleSaveSample();
+        }
+      }
+
+      // Cmd/Ctrl + C for clearing chat
+      if (e.key === "c" && modifierKey) {
+        e.preventDefault();
+        handleClear();
+      }
+
+      // Only trigger arrow shortcuts when not typing in an input/textarea
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      // Up arrow for thumbs up
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setFeedbackDialogOpen(true);
+        // Auto-select positive feedback
+        setTimeout(() => {
+          const positiveButton = document.querySelector(
+            '[data-feedback="positive"]'
+          ) as HTMLButtonElement;
+          if (positiveButton) positiveButton.click();
+        }, 100);
+      }
+
+      // Down arrow for thumbs down
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setFeedbackDialogOpen(true);
+        // Auto-select negative feedback
+        setTimeout(() => {
+          const negativeButton = document.querySelector(
+            '[data-feedback="negative"]'
+          ) as HTMLButtonElement;
+          if (negativeButton) negativeButton.click();
+        }, 100);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    useStructuredOutput,
+    object,
+    messages.length,
+    savingSample,
+    handleSaveSample,
+    handleClear,
+  ]);
+
   const loadSampleGroups = async () => {
     try {
       const response = await fetch("/api/sample-groups");

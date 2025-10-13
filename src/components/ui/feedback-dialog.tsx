@@ -12,7 +12,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface FeedbackDialogProps {
   open: boolean;
@@ -50,6 +50,25 @@ export function FeedbackDialog({
     onOpenChange(false);
   };
 
+  // Keyboard shortcut for saving (Cmd/Ctrl + S)
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+      const modifierKey = isMac ? e.metaKey : e.ctrlKey;
+
+      // Cmd/Ctrl + S to save
+      if (e.key === "s" && modifierKey && rating) {
+        e.preventDefault();
+        handleSave();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, rating, comment]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
@@ -69,6 +88,7 @@ export function FeedbackDialog({
               variant={rating === "positive" ? "default" : "outline"}
               size="lg"
               onClick={() => setRating("positive")}
+              data-feedback="positive"
               className={cn(
                 "flex flex-col items-center gap-2 h-auto py-4 px-8",
                 rating === "positive" &&
@@ -84,6 +104,7 @@ export function FeedbackDialog({
               variant={rating === "negative" ? "default" : "outline"}
               size="lg"
               onClick={() => setRating("negative")}
+              data-feedback="negative"
               className={cn(
                 "flex flex-col items-center gap-2 h-auto py-4 px-8",
                 rating === "negative" &&

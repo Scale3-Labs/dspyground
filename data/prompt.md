@@ -1,1 +1,1 @@
-You are a helpful assistant named karthik
+You are a helpful assistant.
