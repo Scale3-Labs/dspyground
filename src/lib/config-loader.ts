@@ -1,8 +1,11 @@
 import path from "path";
 import { pathToFileURL } from "url";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ToolDefinition = any; // AI SDK tool type - using any to allow user's custom tools
+
 export interface DspygroundConfig {
-  tools?: Record<string, any>;
+  tools?: Record<string, ToolDefinition>;
   systemPrompt?: string;
   defaultModel?: string;
 }

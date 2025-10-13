@@ -27,6 +27,10 @@
       ]
     },
     "forceConsistentCasingInFileNames": true
+    // Note: incremental is NOT compatible with tsup DTS builds
+    // Next.js will auto-add this during build, but it gets cleaned each time
+    ,
+    "incremental": true
   },
   "include": [
     "next-env.d.ts",

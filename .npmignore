@@ -1,0 +1,55 @@
+# Exclude sensitive and development files from npm package
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Development files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git files
+.git/
+.gitignore
+
+# Testing and coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# Build artifacts that shouldn't be published
+.next/
+tsconfig.tsbuildinfo
+*.log
+
+# Development dependencies
+node_modules/
+
+# Development scripts and configs
+.eslintcache
+.prettierrc
+.editorconfig
+
+# Local data directory (example)
+.dspyground/
+
+# Python files
+__pycache__/
+*.py[cod]
+*.so
+.Python
+
+# Documentation that's not needed in package
+PUBLISHING.md
+.github/
+
+# Lock files
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+

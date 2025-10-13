@@ -19,7 +19,7 @@
     "testing"
   ],
   "bin": {
-    "dspyground": "./dist/cli/index.js"
+    "dspyground": "./dist/cli/index.mjs"
   },
   "files": [
     "dist",
@@ -36,7 +36,8 @@
   "scripts": {
     "dev": "next dev",
     "dev:cli": "tsx cli/index.ts",
-    "build": "npm run build:cli && npm run build:server",
+    "clean": "rm -rf dist .next tsconfig.tsbuildinfo",
+    "build": "npm run clean && npm run build:cli && npm run build:server",
     "build:cli": "tsup cli/index.ts cli/init.ts cli/dev.ts --format esm --dts --out-dir dist/cli",
     "build:server": "next build",
     "start": "next start",
