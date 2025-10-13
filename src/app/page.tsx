@@ -1,13 +1,25 @@
 import { Button } from "@/components/ui/button";
+import { Squares } from "@/components/ui/squares-background";
 import Link from "next/link";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-16 max-w-6xl">
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* Animated Background */}
+      <div className="fixed inset-0 z-0 opacity-[0.15] dark:opacity-20">
+        <Squares
+          direction="diagonal"
+          speed={0.5}
+          squareSize={40}
+          borderColor="currentColor"
+          hoverFillColor="rgba(128, 128, 128, 0.3)"
+          className="text-muted-foreground/40"
+        />
+      </div>
+      <div className="container mx-auto px-4 py-24 max-w-6xl relative z-10">
         {/* Hero Section */}
-        <div className="text-center mb-16">
-          <h1 className="text-5xl font-bold text-foreground mb-6">
+        <div className="text-center mb-24 mt-12">
+          <h1 className="text-8xl md:text-7xl font-bold mb-6 bg-gradient-to-b from-foreground via-foreground/90 to-foreground/50 bg-clip-text text-transparent">
             DSPyground
           </h1>
           <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
@@ -194,81 +206,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Testimonial */}
-        <div className="text-center mb-16">
-          <div className="max-w-4xl mx-auto">
-            <div className="border rounded-lg p-8 bg-muted/30">
-              <div className="flex items-center justify-center mb-4">
-                <svg
-                  className="w-8 h-8 text-primary"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                </svg>
-              </div>
-              <blockquote className="text-xl font-medium text-foreground mb-4">
-                &quot;Both DSPy and (especially) GEPA are currently severely
-                under hyped in the AI context engineering world&quot;
-              </blockquote>
-              <div className="flex items-center justify-center space-x-2">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">TL</span>
-                </div>
-                <div className="text-left">
-                  <div className="font-semibold text-foreground">
-                    Tobi Lutke
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    CEO, Shopify
-                  </div>
-                </div>
-              </div>
-              <div className="mt-4">
-                <a
-                  href="https://x.com/tobi/status/1963434604741701909"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:text-primary/80 text-sm transition-colors"
-                >
-                  View on X →
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Team Attribution */}
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center justify-center space-x-2 text-muted-foreground mb-4">
-            <span>Built with ❤️ by the team that created</span>
-          </div>
-          <div className="flex justify-center items-center space-x-3">
-            <a
-              href="https://langtrace.ai"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-foreground hover:text-primary transition-colors font-semibold"
-            >
-              Langtrace AI
-            </a>
-            <span className="text-muted-foreground">and</span>
-            <a
-              href="https://heyzest.ai"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-foreground hover:text-primary transition-colors font-semibold"
-            >
-              Zest
-            </a>
-          </div>
-          <div className="mt-4">
-            <div className="inline-flex items-center px-3 py-1 rounded-full bg-muted text-muted-foreground text-sm">
-              Apache 2.0 Licensed • Fully Open Source
-            </div>
-          </div>
-        </div>
-
         {/* Installation */}
         <div className="border rounded-lg p-8">
           <h2 className="text-2xl font-bold mb-6 text-foreground">
@@ -309,6 +246,37 @@ dspyground dev`}
                 <code>http://localhost:3000</code>. Make sure you have Node.js
                 installed on your system.
               </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Team Attribution */}
+        <div className="text-center mt-16">
+          <div className="inline-flex items-center justify-center space-x-2 text-muted-foreground mb-4">
+            <span>Built with ❤️ by the team that created</span>
+          </div>
+          <div className="flex justify-center items-center space-x-3">
+            <a
+              href="https://langtrace.ai"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-foreground hover:text-primary transition-colors font-semibold"
+            >
+              Langtrace AI
+            </a>
+            <span className="text-muted-foreground">and</span>
+            <a
+              href="https://heyzest.ai"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-foreground hover:text-primary transition-colors font-semibold"
+            >
+              Zest
+            </a>
+          </div>
+          <div className="mt-4">
+            <div className="inline-flex items-center px-3 py-1 rounded-full bg-muted text-muted-foreground text-sm">
+              Apache 2.0 Licensed • Fully Open Source
             </div>
           </div>
         </div>
