@@ -1,6 +1,6 @@
 {
   "name": "dspyground",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": false,
   "description": "DSPyGround - Optimize and test your AI agents with AI SDK",
   "author": "Karthik Kalyanaraman",
@@ -24,22 +24,25 @@
   "files": [
     "dist",
     "templates",
-    ".next",
+    ".next/standalone",
     "src",
     "public",
     "python_optimizer",
     "next.config.ts",
     "tsconfig.json",
     "postcss.config.mjs",
-    "components.json"
+    "components.json",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "dev": "next dev",
     "dev:cli": "tsx cli/index.ts",
     "clean": "rm -rf dist .next tsconfig.tsbuildinfo",
-    "build": "npm run clean && npm run build:cli && npm run build:server",
+    "build": "npm run clean && npm run build:cli && npm run build:server && npm run clean:sensitive",
     "build:cli": "tsup cli/index.ts cli/init.ts cli/dev.ts --format esm --dts --out-dir dist/cli",
     "build:server": "next build",
+    "clean:sensitive": "find .next/standalone -name '.env*' -type f ! -name '.env.example' -delete && find .next/standalone -name '.dspyground' -type d -exec rm -rf {} + 2>/dev/null || true",
     "start": "next start",
     "lint": "eslint",
     "test:metrics": "npx tsx src/lib/test-metrics.ts",

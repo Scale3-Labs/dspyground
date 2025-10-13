@@ -8,8 +8,7 @@ A portable playground for prompt optimization using a modified GEPA (Genetic-Par
 
 ### Prerequisites
 - Node.js 18+
-- OpenAI API key or AI Gateway API key
-- Set `OPENAI_API_KEY` or `AI_GATEWAY_API_KEY` in your environment
+- AI Gateway API key (set `AI_GATEWAY_API_KEY` in your `.env` file)
 - An existing AI SDK project (or start a new one)
 
 ### Installation & Setup
@@ -47,6 +46,16 @@ export default {
   defaultModel: 'openai/gpt-4o-mini'
 }
 ```
+
+### Environment Setup
+
+Create a `.env` file in your project root:
+
+```bash
+AI_GATEWAY_API_KEY=your_api_key_here
+```
+
+This API key will be used by DSPyGround to access AI models through AI Gateway.
 
 ### Start the Dev Server
 
@@ -97,7 +106,6 @@ Our implementation extends the traditional GEPA (Genetic-Pareto Evolutionary Alg
 4. **Best Selection**: Returns prompt with highest overall score
 
 **Key Differences from Standard GEPA:**
-- No Python dependency—runs entirely in TypeScript/Node.js
 - Evaluates on full conversational trajectories, not just final responses
 - Uses structured output (Zod schemas) for consistent metric scoring
 - Supports tool-calling agents with efficiency and tool accuracy metrics
@@ -160,10 +168,9 @@ Toggle between regular chat and structured output using the switch in the UI.
 - `/api/samples`, `/api/runs` - Data persistence
 - `/api/metrics-prompt` - Configurable metrics
 
-**Optimization Engine**: Custom TypeScript implementation
-- Full GEPA algorithm in `src/app/api/optimize/route.ts`
+**Optimization Engine**: Hybrid TypeScript + Python implementation
+- TypeScript GEPA algorithm in `src/app/api/optimize/route.ts`
 - Reflection-based scoring in `src/lib/metrics.ts`
-- No external Python services required
 
 ## Local Data Files
 
