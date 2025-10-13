@@ -29,13 +29,44 @@ import {
   ToolOutput,
 } from "@/components/ai-elements/tool";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { FeedbackDialog } from "@/components/ui/feedback-dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { PromptEditorDialog } from "@/components/ui/prompt-editor-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useChat, experimental_useObject as useObject } from "@ai-sdk/react";
 import { DefaultChatTransport, type ToolUIPart } from "ai";
-import { FileText, MessageSquare } from "lucide-react";
+import {
+  BookOpen,
+  Database,
+  FileText,
+  MessageSquare,
+  Plus,
+} from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -66,6 +97,12 @@ export default function Chat() {
   const [currentPrompt, setCurrentPrompt] = useState<string>("");
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const [promptEditorOpen, setPromptEditorOpen] = useState(false);
+  const [sampleGroups, setSampleGroups] = useState<any[]>([]);
+  const [currentGroupId, setCurrentGroupId] = useState<string>("");
+  const [newGroupDialogOpen, setNewGroupDialogOpen] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [schemaEditorOpen, setSchemaEditorOpen] = useState(false);
+  const [schemaContent, setSchemaContent] = useState<string>("");
 
   // Wrap setSelectedModel to prevent empty values
   const setSelectedModel = useCallback(
@@ -336,6 +373,116 @@ export default function Chat() {
       : "ready"
     : status;
 
+  // Load sample groups
+  useEffect(() => {
+    loadSampleGroups();
+    loadSchema();
+  }, []);
+
+  const loadSampleGroups = async () => {
+    try {
+      const response = await fetch("/api/sample-groups");
+      if (response.ok) {
+        const data = await response.json();
+        setSampleGroups(data.groups || []);
+        setCurrentGroupId(data.currentGroupId || "");
+      }
+    } catch (error) {
+      console.error("Failed to load sample groups:", error);
+    }
+  };
+
+  const loadSchema = async () => {
+    try {
+      const response = await fetch("/api/schema");
+      if (response.ok) {
+        const data = await response.json();
+        setSchemaContent(JSON.stringify(data, null, 2));
+      }
+    } catch (error) {
+      console.error("Failed to load schema:", error);
+    }
+  };
+
+  const handleSaveSchema = async () => {
+    try {
+      const parsed = JSON.parse(schemaContent);
+      const response = await fetch("/api/schema", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(parsed),
+      });
+
+      if (response.ok) {
+        toast.success("Schema saved successfully");
+        setSchemaEditorOpen(false);
+      } else {
+        toast.error("Failed to save schema");
+      }
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        toast.error("Invalid JSON format");
+      } else {
+        toast.error("Failed to save schema");
+      }
+    }
+  };
+
+  const handleCreateNewGroup = async () => {
+    if (!newGroupName.trim()) {
+      toast.error("Please enter a group name");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/sample-groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newGroupName.trim() }),
+      });
+
+      if (response.ok) {
+        toast.success("New sample group created");
+        await loadSampleGroups();
+        setNewGroupDialogOpen(false);
+        setNewGroupName("");
+        // Clear chat for new group
+        handleClear();
+      } else {
+        toast.error("Failed to create sample group");
+      }
+    } catch (error) {
+      console.error("Failed to create sample group:", error);
+      toast.error("Failed to create sample group");
+    }
+  };
+
+  const handleGroupChange = async (groupId: string) => {
+    // Handle the special "new-group" option
+    if (groupId === "new-group") {
+      setNewGroupDialogOpen(true);
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/sample-groups", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentGroupId: groupId }),
+      });
+
+      if (response.ok) {
+        setCurrentGroupId(groupId);
+        toast.success("Sample group changed");
+      } else {
+        toast.error("Failed to change sample group");
+      }
+    } catch (error) {
+      console.error("Failed to change sample group:", error);
+      toast.error("Failed to change sample group");
+    }
+  };
+
   // Determine stop handler based on mode
   const handleStop = useStructuredOutput ? stopObject : stop;
 
@@ -350,6 +497,12 @@ export default function Chat() {
               <ThemeToggle />
             </div>
             <div className="flex items-center gap-3">
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/how-to">
+                  <BookOpen className="size-4 mr-2" />
+                  How To
+                </Link>
+              </Button>
               <div className="flex items-center gap-2 px-3 py-1.5 border rounded-md bg-background">
                 <span className="text-xs text-muted-foreground">Text</span>
                 <Switch
@@ -360,14 +513,24 @@ export default function Chat() {
                   Structured
                 </span>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSaveSample}
-                disabled={savingSample}
-              >
-                {savingSample ? "Saving..." : "Sample"}
-              </Button>
+              <Select value={currentGroupId} onValueChange={handleGroupChange}>
+                <SelectTrigger className="w-[180px] h-8 text-xs">
+                  <SelectValue placeholder="Select group" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sampleGroups.map((group) => (
+                    <SelectItem key={group.id} value={group.id}>
+                      {group.name} ({group.samples.length})
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="new-group" className="text-blue-600">
+                    <div className="flex items-center gap-1.5">
+                      <Plus className="size-3" />
+                      <span>New Group</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
               <Button variant="ghost" size="sm" onClick={handleClear}>
                 Clear
               </Button>
@@ -381,43 +544,41 @@ export default function Chat() {
         <div className="max-w-4xl mx-auto h-full flex flex-col px-6">
           {useStructuredOutput ? (
             // Structured Output Mode
-            <div className="flex-1 min-h-0 overflow-y-auto py-6">
-              {!currentPrompt ? (
-                <div className="flex flex-col items-center justify-center h-full text-center">
-                  <MessageSquare className="size-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">
-                    Structured Output Mode
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Ask a question to generate a structured response
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {/* User prompt */}
-                  <div className="flex justify-end">
-                    <div className="max-w-[80%] bg-primary text-primary-foreground rounded-lg px-4 py-2">
-                      <p className="text-sm">{currentPrompt}</p>
-                    </div>
-                  </div>
-
-                  {/* Assistant response */}
-                  {object && (
-                    <div className="flex justify-start">
-                      <div className="max-w-[80%] space-y-2">
-                        <div className="text-[10px] bg-purple-50 text-purple-700 border border-purple-200 rounded px-1.5 py-0.5 inline-block dark:bg-purple-950/30 dark:border-purple-900/40 dark:text-purple-300">
-                          Structured Output{" "}
-                          {isObjectLoading && "(Generating...)"}
-                        </div>
-                        <pre className="text-xs whitespace-pre-wrap break-words text-neutral-700 bg-neutral-50 border border-neutral-200 rounded p-4 dark:text-neutral-200 dark:bg-neutral-900 dark:border-neutral-800">
-                          {JSON.stringify(object, null, 2)}
-                        </pre>
+            <Conversation className="flex-1 min-h-0">
+              <ConversationContent>
+                {!currentPrompt ? (
+                  <ConversationEmptyState
+                    icon={<MessageSquare className="size-12" />}
+                    title="Structured Output Mode"
+                    description="Ask a question to generate a structured response"
+                  />
+                ) : (
+                  <div className="space-y-6">
+                    {/* User prompt */}
+                    <div className="flex justify-end">
+                      <div className="max-w-[80%] bg-primary text-primary-foreground rounded-lg px-4 py-2">
+                        <p className="text-sm">{currentPrompt}</p>
                       </div>
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
+
+                    {/* Assistant response */}
+                    {object && (
+                      <div className="flex justify-start">
+                        <div className="max-w-[80%] space-y-2">
+                          <div className="text-[10px] bg-purple-50 text-purple-700 border border-purple-200 rounded px-1.5 py-0.5 inline-block dark:bg-purple-950/30 dark:border-purple-900/40 dark:text-purple-300">
+                            Structured Output{" "}
+                            {isObjectLoading && "(Generating...)"}
+                          </div>
+                          <pre className="text-xs whitespace-pre-wrap break-words text-neutral-700 bg-neutral-50 border border-neutral-200 rounded p-4 dark:text-neutral-200 dark:bg-neutral-900 dark:border-neutral-800">
+                            {JSON.stringify(object, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </ConversationContent>
+            </Conversation>
           ) : (
             // Text Chat Mode
             <Conversation className="flex-1 min-h-0">
@@ -522,16 +683,63 @@ export default function Chat() {
                 )}
               </PromptInputTools>
               <div className="flex items-center gap-1 ml-auto">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setPromptEditorOpen(true)}
-                  className="h-8"
-                  title="Edit system prompt"
-                >
-                  <FileText className="size-4" />
-                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setPromptEditorOpen(true)}
+                        className="h-8"
+                      >
+                        <FileText className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Edit system prompt</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  {useStructuredOutput && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSchemaEditorOpen(true)}
+                          className="h-8"
+                        >
+                          <Database className="size-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Edit output schema</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleSaveSample}
+                        disabled={
+                          (useStructuredOutput && !object) ||
+                          (!useStructuredOutput && messages.length < 2) ||
+                          savingSample
+                        }
+                        className="h-8"
+                      >
+                        <Plus className="size-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Save as sample</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <PromptInputSubmit
                   status={currentStatus === "streaming" ? "streaming" : "ready"}
                   onClick={
@@ -561,7 +769,85 @@ export default function Chat() {
       <PromptEditorDialog
         open={promptEditorOpen}
         onOpenChange={setPromptEditorOpen}
+        currentSampleGroupId={currentGroupId}
       />
+
+      {/* New Group Dialog */}
+      <Dialog open={newGroupDialogOpen} onOpenChange={setNewGroupDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Sample Group</DialogTitle>
+            <DialogDescription>
+              Enter a name for your new sample group. This will help you
+              organize different sets of test samples.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="group-name">Group Name</Label>
+              <Input
+                id="group-name"
+                placeholder="e.g., Tone Tests, Safety Tests..."
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleCreateNewGroup();
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setNewGroupDialogOpen(false);
+                setNewGroupName("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleCreateNewGroup}>Create Group</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Schema Editor Dialog */}
+      <Dialog open={schemaEditorOpen} onOpenChange={setSchemaEditorOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>Edit Schema</DialogTitle>
+            <DialogDescription>
+              Edit the JSON schema for structured output generation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="schema-content">Schema (JSON)</Label>
+              <Textarea
+                id="schema-content"
+                className="font-mono text-xs min-h-[400px]"
+                value={schemaContent}
+                onChange={(e) => setSchemaContent(e.target.value)}
+                placeholder='{"type": "object", "properties": {...}}'
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSchemaEditorOpen(false);
+                loadSchema(); // Reset to original schema
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleSaveSchema}>Save Schema</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

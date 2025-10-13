@@ -153,8 +153,16 @@ async function readSamples() {
   await ensureFile();
   const data = await fs.readFile(getSamplesPath(), "utf-8");
   const parsed = JSON.parse(data);
-  const result = SamplesSchema.safeParse(parsed);
 
+  // Handle new groups structure
+  if (parsed.groups && Array.isArray(parsed.groups)) {
+    // Return all samples from all groups for backward compatibility
+    const allSamples = parsed.groups.flatMap((g: any) => g.samples || []);
+    return { samples: allSamples };
+  }
+
+  // Handle old structure
+  const result = SamplesSchema.safeParse(parsed);
   if (result.success) {
     return result.data;
   }
@@ -165,11 +173,26 @@ async function readSamples() {
 
 async function writeSamples(samples: z.infer<typeof SamplesSchema>) {
   await ensureFile();
-  await fs.writeFile(
-    getSamplesPath(),
-    JSON.stringify(samples, null, 2),
-    "utf-8"
-  );
+  const data = await fs.readFile(getSamplesPath(), "utf-8");
+  const parsed = JSON.parse(data);
+
+  // If groups structure exists, write samples to all groups (backward compat)
+  if (parsed.groups && Array.isArray(parsed.groups)) {
+    // This is deprecated - samples should be added via POST which uses current group
+    parsed.groups[0].samples = samples.samples;
+    await fs.writeFile(
+      getSamplesPath(),
+      JSON.stringify(parsed, null, 2),
+      "utf-8"
+    );
+  } else {
+    // Old structure
+    await fs.writeFile(
+      getSamplesPath(),
+      JSON.stringify(samples, null, 2),
+      "utf-8"
+    );
+  }
 }
 
 export async function GET() {
@@ -195,7 +218,9 @@ export async function POST(req: Request) {
       throw new Error("Invalid request: messages array required");
     }
 
-    const samples = await readSamples();
+    await ensureFile();
+    const data = await fs.readFile(getSamplesPath(), "utf-8");
+    const parsed = JSON.parse(data);
 
     // Transform UIMessages to simple role/content format
     const transformedMessages = transformMessages(json.messages as UIMessage[]);
@@ -211,13 +236,47 @@ export async function POST(req: Request) {
           }
         : undefined,
     };
-    samples.samples.push(session);
 
-    await writeSamples(samples);
-    return new Response(JSON.stringify(samples), {
-      status: 201,
-      headers: { "Content-Type": "application/json" },
-    });
+    // Handle new groups structure
+    if (parsed.groups && Array.isArray(parsed.groups)) {
+      const currentGroupId = parsed.currentGroupId || "default";
+      const currentGroup = parsed.groups.find(
+        (g: any) => g.id === currentGroupId
+      );
+
+      if (currentGroup) {
+        currentGroup.samples.push(session);
+      } else {
+        // Fallback to first group
+        if (parsed.groups.length > 0) {
+          parsed.groups[0].samples.push(session);
+        }
+      }
+
+      await fs.writeFile(
+        getSamplesPath(),
+        JSON.stringify(parsed, null, 2),
+        "utf-8"
+      );
+
+      return new Response(
+        JSON.stringify({ samples: currentGroup?.samples || [] }),
+        {
+          status: 201,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    } else {
+      // Handle old structure
+      const samples = await readSamples();
+      samples.samples.push(session);
+      await writeSamples(samples);
+
+      return new Response(JSON.stringify(samples), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return new Response(JSON.stringify({ error: message }), {

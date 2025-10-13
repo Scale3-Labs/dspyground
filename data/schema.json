@@ -1,39 +1,21 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "description": "JSON Schema for AI agent routing and task management. The AI will return responses matching this schema when 'Structured Output' mode is enabled.",
   "type": "object",
   "properties": {
-    "response": {
+    "name": {
       "type": "string",
-      "description": "The response to the user's message"
+      "description": "The name of the person"
     },
-    "next_agent": {
+    "age": {
+      "type": "number",
+      "description": "The age of the person"
+    },
+    "email": {
       "type": "string",
-      "enum": ["planner", "router"],
-      "description": "The next best agent to handle the request"
-    },
-    "next_agent_app_names": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "description": "The names of the apps to be used by the next agent for the tasks. This is only applicable if the next agent is the planner."
-    },
-    "task_description": {
-      "type": "string",
-      "description": "The description of the task to be performed by the planner. This should make sense independent of the conversation history."
-    },
-    "task_completed": {
-      "type": "boolean",
-      "description": "Whether the task has been completed. If you set this to true, the planner will not be called again.",
-      "default": false
-    },
-    "cancel_current_request": {
-      "type": "boolean",
-      "description": "Whether to cancel the currently processing request",
-      "default": false
+      "description": "The email address"
     }
   },
-  "required": [],
+  "required": [
+    "name"
+  ],
   "additionalProperties": false
 }

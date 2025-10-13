@@ -55,6 +55,15 @@ type StreamLogEntry = {
   timestamp: number;
 };
 
+interface OptimizationState {
+  isOptimizing: boolean;
+  runId: string | null;
+  streamLogs: StreamLogEntry[];
+  chartData: ChartPoint[];
+  iterations: IterationResult[];
+  finalPrompt: string;
+}
+
 export default function OptimizePage() {
   // Settings state
   const [systemPrompt, setSystemPrompt] = useState<string>("");
@@ -68,6 +77,8 @@ export default function OptimizePage() {
   ]);
   const [optimizeStructuredOutput, setOptimizeStructuredOutput] =
     useState<boolean>(false);
+  const [sampleGroups, setSampleGroups] = useState<any[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState<string>("");
 
   // Dialog state
   const [promptEditorOpen, setPromptEditorOpen] = useState(false);
@@ -76,6 +87,7 @@ export default function OptimizePage() {
   // UI state
   const [textModels, setTextModels] = useState<GatewayModel[]>([]);
   const [isOptimizing, setIsOptimizing] = useState(false);
+  const [currentRunId, setCurrentRunId] = useState<string | null>(null);
   const [iterations, setIterations] = useState<IterationResult[]>([]);
   const [chartData, setChartData] = useState<ChartPoint[]>([]);
   const [finalPrompt, setFinalPrompt] = useState<string>("");
@@ -83,6 +95,81 @@ export default function OptimizePage() {
   const [streamLogs, setStreamLogs] = useState<StreamLogEntry[]>([]);
   const [activeTab, setActiveTab] = useState<string>("settings");
   const logsEndRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Save optimization state to localStorage
+  const saveOptimizationState = useCallback(() => {
+    if (typeof window === "undefined") return;
+
+    const state: OptimizationState = {
+      isOptimizing,
+      runId: currentRunId,
+      streamLogs,
+      chartData,
+      iterations,
+      finalPrompt,
+    };
+
+    localStorage.setItem("optimizationState", JSON.stringify(state));
+  }, [
+    isOptimizing,
+    currentRunId,
+    streamLogs,
+    chartData,
+    iterations,
+    finalPrompt,
+  ]);
+
+  // Restore optimization state from localStorage
+  const restoreOptimizationState = useCallback(async () => {
+    if (typeof window === "undefined") return false;
+
+    try {
+      const saved = localStorage.getItem("optimizationState");
+      if (!saved) return false;
+
+      const state: OptimizationState = JSON.parse(saved);
+
+      // Check if the run is actually still running by checking runs.json
+      if (state.runId) {
+        const response = await fetch("/api/runs");
+        if (response.ok) {
+          const data = await response.json();
+          const run = data.runs.find((r: any) => r.id === state.runId);
+
+          if (run && run.status === "running") {
+            // Restore the state
+            setIsOptimizing(false); // Set to false since we're not actively streaming
+            setCurrentRunId(state.runId);
+            setStreamLogs(state.streamLogs);
+            setChartData(state.chartData);
+            setIterations(state.iterations);
+            setFinalPrompt(state.finalPrompt);
+            setActiveTab("progress");
+
+            toast.info(
+              "Previous optimization is still running. It may have been interrupted."
+            );
+            return true;
+          } else {
+            // Run completed or errored, clear the state
+            localStorage.removeItem("optimizationState");
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to restore optimization state:", error);
+    }
+
+    return false;
+  }, []);
+
+  // Check for running optimizations on mount
+  useEffect(() => {
+    (async () => {
+      await restoreOptimizationState();
+    })();
+  }, [restoreOptimizationState]);
 
   // Load preferences on mount
   useEffect(() => {
@@ -122,6 +209,22 @@ export default function OptimizePage() {
         }
       } catch (error) {
         console.error("Failed to load models:", error);
+      }
+    })();
+  }, []);
+
+  // Load sample groups
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/sample-groups", { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          setSampleGroups(data.groups || []);
+          setSelectedGroupId(data.currentGroupId || "");
+        }
+      } catch (error) {
+        console.error("Failed to load sample groups:", error);
       }
     })();
   }, []);
@@ -181,6 +284,21 @@ export default function OptimizePage() {
     logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [streamLogs]);
 
+  // Auto-save state when it changes
+  useEffect(() => {
+    if (isOptimizing || currentRunId) {
+      saveOptimizationState();
+    }
+  }, [
+    isOptimizing,
+    currentRunId,
+    streamLogs,
+    chartData,
+    iterations,
+    finalPrompt,
+    saveOptimizationState,
+  ]);
+
   const handleMetricToggle = (metric: MetricType) => {
     setSelectedMetrics((prev) =>
       prev.includes(metric)
@@ -200,12 +318,34 @@ export default function OptimizePage() {
       return;
     }
 
+    // Check if there's already a running optimization
+    try {
+      const response = await fetch("/api/runs");
+      if (response.ok) {
+        const data = await response.json();
+        const runningRun = data.runs.find((r: any) => r.status === "running");
+
+        if (runningRun) {
+          toast.error(
+            "An optimization is already running. Please wait for it to complete or stop it first."
+          );
+          return;
+        }
+      }
+    } catch (error) {
+      console.error("Failed to check for running optimizations:", error);
+    }
+
     setIsOptimizing(true);
     setIterations([]);
     setChartData([]);
     setFinalPrompt("");
     setStreamLogs([]);
+    setCurrentRunId(null);
     setActiveTab("progress"); // Switch to progress tab
+
+    // Create abort controller for this run
+    abortControllerRef.current = new AbortController();
 
     try {
       const response = await fetch("/api/optimize", {
@@ -218,6 +358,7 @@ export default function OptimizePage() {
           numRollouts,
           selectedMetrics,
           useStructuredOutput: optimizeStructuredOutput,
+          sampleGroupId: selectedGroupId,
         }),
       });
 
@@ -264,6 +405,16 @@ export default function OptimizePage() {
             const result: IterationResult = JSON.parse(jsonString);
 
             setIterations((prev) => [...prev, result]);
+
+            // Extract run ID from the start message
+            if (result.type === "start" && result.message) {
+              const runIdMatch = result.message.match(
+                /Run ID: ([a-zA-Z0-9_-]+)/
+              );
+              if (runIdMatch && runIdMatch[1]) {
+                setCurrentRunId(runIdMatch[1]);
+              }
+            }
 
             // Process stream logs
             if (result.type === "iteration") {
@@ -344,10 +495,16 @@ export default function OptimizePage() {
                 },
               ]);
               toast.success("Optimization complete!");
+              // Clear localStorage state when completed
+              localStorage.removeItem("optimizationState");
+              setCurrentRunId(null);
             }
 
             if (result.type === "error") {
               toast.error(result.error || "Optimization error");
+              // Clear localStorage state on error
+              localStorage.removeItem("optimizationState");
+              setCurrentRunId(null);
             }
           } catch (parseError) {
             console.error("Error parsing result:", parseError);
@@ -371,9 +528,42 @@ export default function OptimizePage() {
     optimizeStructuredOutput,
   ]);
 
-  const handleStop = () => {
+  const handleStop = async () => {
+    // Abort the fetch request if it's running
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
     setIsOptimizing(false);
-    toast.info("Stopping optimization...");
+    toast.info("Optimization stopped");
+
+    // Mark the run as error in the backend if we have a run ID
+    if (currentRunId) {
+      try {
+        const response = await fetch("/api/runs");
+        if (response.ok) {
+          const data = await response.json();
+          const run = data.runs.find((r: any) => r.id === currentRunId);
+
+          if (run && run.status === "running") {
+            // Update the run status to error (stopped)
+            run.status = "error";
+            await fetch("/api/runs", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(run),
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Failed to update run status:", error);
+      }
+    }
+
+    // Clear localStorage state
+    localStorage.removeItem("optimizationState");
+    setCurrentRunId(null);
   };
 
   return (
@@ -400,6 +590,35 @@ export default function OptimizePage() {
 
           {/* Settings Tab */}
           <TabsContent value="settings" className="mt-0">
+            {currentRunId && !isOptimizing && (
+              <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+                    <Loader2 className="size-4" />
+                    <p className="text-sm font-medium">
+                      An optimization run was in progress. View it in the
+                      Progress tab or clear it to start a new one.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      localStorage.removeItem("optimizationState");
+                      setCurrentRunId(null);
+                      setStreamLogs([]);
+                      setChartData([]);
+                      setIterations([]);
+                      setFinalPrompt("");
+                      toast.info("Previous run cleared");
+                    }}
+                  >
+                    Clear Run
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-6">
               <div className="flex-1 space-y-6">
                 <div className="border rounded-lg p-6 bg-card">
@@ -505,6 +724,28 @@ export default function OptimizePage() {
                       value={numRollouts}
                       onChange={(e) => setNumRollouts(Number(e.target.value))}
                     />
+                  </div>
+
+                  <Separator className="my-4" />
+
+                  {/* Sample Group */}
+                  <div className="space-y-2 mb-4">
+                    <label className="text-sm font-medium">Sample Group</label>
+                    <Select
+                      value={selectedGroupId}
+                      onValueChange={setSelectedGroupId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select sample group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sampleGroups.map((group) => (
+                          <SelectItem key={group.id} value={group.id}>
+                            {group.name} ({group.samples.length} samples)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <Separator className="my-4" />
@@ -622,11 +863,27 @@ export default function OptimizePage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left Half: Streaming Logs */}
               <div className="border rounded-lg p-6 bg-card">
-                <h2 className="text-lg font-semibold mb-4">Live Stream</h2>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold">Live Stream</h2>
+                  {currentRunId && !isOptimizing && (
+                    <span className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded">
+                      Viewing previous run
+                    </span>
+                  )}
+                </div>
                 <div className="h-[calc(100vh-280px)] overflow-y-auto space-y-4 font-mono text-xs">
-                  {streamLogs.length === 0 && !isOptimizing && (
+                  {streamLogs.length === 0 &&
+                    !isOptimizing &&
+                    !currentRunId && (
+                      <p className="text-sm text-muted-foreground">
+                        Start optimization to see live logs...
+                      </p>
+                    )}
+
+                  {streamLogs.length === 0 && !isOptimizing && currentRunId && (
                     <p className="text-sm text-muted-foreground">
-                      Start optimization to see live logs...
+                      No logs available for this run. It may have been
+                      interrupted.
                     </p>
                   )}
 

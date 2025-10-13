@@ -1,58 +1,11 @@
 {
-  "samples": [
+  "groups": [
     {
-      "id": "1760247870806-wh6dyc",
-      "timestamp": "2025-10-12T05:44:30.806Z",
-      "messages": [
-        {
-          "role": "user",
-          "content": "hi whats up"
-        },
-        {
-          "role": "assistant",
-          "content": "Hello! I'm here to help. What’s on your mind today?"
-        }
-      ],
-      "feedback": {
-        "rating": "negative",
-        "comment": "be more casual"
-      }
-    },
-    {
-      "id": "1760247887678-vcu8xz",
-      "timestamp": "2025-10-12T05:44:47.678Z",
-      "messages": [
-        {
-          "role": "user",
-          "content": "hello"
-        },
-        {
-          "role": "assistant",
-          "content": "Hello! How can I assist you today?"
-        }
-      ],
-      "feedback": {
-        "rating": "negative",
-        "comment": "be more casual like a genz"
-      }
-    },
-    {
-      "id": "1760247949847-mr8xa0",
-      "timestamp": "2025-10-12T05:45:49.847Z",
-      "messages": [
-        {
-          "role": "user",
-          "content": "hey can you help with news"
-        },
-        {
-          "role": "assistant",
-          "content": "Of course! What specific news topic or area are you interested in?"
-        }
-      ],
-      "feedback": {
-        "rating": "negative",
-        "comment": "should not help with news and unrelated information"
-      }
+      "id": "default",
+      "name": "Default",
+      "samples": [],
+      "createdAt": "2025-10-13T00:28:08.644Z"
     }
-  ]
+  ],
+  "currentGroupId": "default"
 }

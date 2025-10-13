@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { generateObject, generateText, jsonSchema } from "ai";
 import { promises as fs } from "fs";
+import { nanoid } from "nanoid";
 import * as path from "path";
 import * as availableTools from "../../../../data/tools";
 import type { Trajectory } from "../../../lib/metrics";
@@ -11,6 +12,7 @@ import type {
   PromptCandidate,
   Sample,
 } from "../../../lib/optimizer-types";
+import type { OptimizationRun, RunPrompt } from "../runs/route";
 
 export const maxDuration = 300; // 5 minutes for optimization
 
@@ -21,14 +23,24 @@ interface OptimizeRequest {
   numRollouts: number;
   selectedMetrics: MetricType[];
   useStructuredOutput?: boolean;
+  sampleGroupId?: string;
 }
 
 // Helper to load samples from data/samples.json
-async function loadSamples(): Promise<Sample[]> {
+async function loadSamples(groupId?: string): Promise<Sample[]> {
   const samplesPath = path.join(process.cwd(), "data", "samples.json");
   try {
     const data = await fs.readFile(samplesPath, "utf-8");
     const parsed = JSON.parse(data);
+
+    // Handle new groups structure
+    if (parsed.groups && Array.isArray(parsed.groups)) {
+      const targetGroupId = groupId || parsed.currentGroupId || "default";
+      const group = parsed.groups.find((g: any) => g.id === targetGroupId);
+      return group ? group.samples : [];
+    }
+
+    // Handle old structure
     return parsed.samples || [];
   } catch {
     return [];
@@ -451,6 +463,34 @@ function selectPrompt(collection: PromptCandidate[]): PromptCandidate {
   );
 }
 
+// Save run data to runs.json
+async function saveRun(run: OptimizationRun): Promise<void> {
+  try {
+    const runsPath = path.join(process.cwd(), "data", "runs.json");
+    let data: { runs: OptimizationRun[] } = { runs: [] };
+
+    try {
+      const fileContent = await fs.readFile(runsPath, "utf-8");
+      data = JSON.parse(fileContent);
+    } catch {
+      // File doesn't exist yet, use default
+    }
+
+    // Find and update existing run or add new one
+    const existingIndex = data.runs.findIndex((r) => r.id === run.id);
+    if (existingIndex >= 0) {
+      data.runs[existingIndex] = run;
+    } else {
+      data.runs.push(run);
+    }
+
+    await fs.writeFile(runsPath, JSON.stringify(data, null, 2));
+    console.log(`[Save Run] Saved run ${run.id}`);
+  } catch (error) {
+    console.error("[Save Run] Error saving run:", error);
+  }
+}
+
 // Main GEPA optimization loop
 async function runGEPA(
   config: OptimizeRequest,
@@ -458,12 +498,21 @@ async function runGEPA(
 ) {
   console.log("[GEPA] Starting optimization...");
 
+  // Create run ID and tracking
+  const runId = nanoid();
+  const runPrompts: RunPrompt[] = [];
+  const samplesUsed: string[] = [];
+
   // Load data
-  const allSamples = await loadSamples();
+  const allSamples = await loadSamples(config.sampleGroupId);
   const seedPrompt = await loadPrompt();
   const schema = config.useStructuredOutput ? await loadSchema() : null;
 
-  console.log(`[GEPA] Loaded ${allSamples.length} samples`);
+  console.log(
+    `[GEPA] Loaded ${allSamples.length} samples from group ${
+      config.sampleGroupId || "default"
+    }`
+  );
 
   if (allSamples.length === 0) {
     await sendProgress({
@@ -477,10 +526,31 @@ async function runGEPA(
     return;
   }
 
+  // Initialize run data
+  const run: OptimizationRun = {
+    id: runId,
+    timestamp: new Date().toISOString(),
+    config: {
+      optimizationModel: config.optimizationModel,
+      reflectionModel: config.reflectionModel,
+      batchSize: config.batchSize,
+      numRollouts: config.numRollouts,
+      selectedMetrics: config.selectedMetrics,
+      useStructuredOutput: config.useStructuredOutput || false,
+      sampleGroupId: config.sampleGroupId,
+    },
+    prompts: [],
+    finalPrompt: seedPrompt,
+    bestScore: 0,
+    samplesUsed: [],
+    collectionSize: 1,
+    status: "running",
+  };
+
   await sendProgress({
     type: "start",
     iteration: 0,
-    message: `Starting GEPA optimization with ${allSamples.length} samples, ${config.numRollouts} iterations`,
+    message: `Starting GEPA optimization with ${allSamples.length} samples, ${config.numRollouts} iterations (Run ID: ${runId})`,
     collectionSize: 1,
     bestScore: 0,
     accepted: false,
@@ -491,7 +561,11 @@ async function runGEPA(
   const initialBatch = [];
   for (let i = 0; i < config.batchSize; i++) {
     const randomIndex = Math.floor(Math.random() * allSamples.length);
-    initialBatch.push(allSamples[randomIndex]);
+    const sample = allSamples[randomIndex];
+    initialBatch.push(sample);
+    if (!samplesUsed.includes(sample.id)) {
+      samplesUsed.push(sample.id);
+    }
   }
 
   const initialEval = await evaluateBatch(
@@ -518,6 +592,15 @@ async function runGEPA(
 
   let bestScore = initialEval.overallScore;
 
+  // Save seed prompt to run
+  runPrompts.push({
+    iteration: 0,
+    prompt: seedPrompt,
+    accepted: true,
+    score: initialEval.overallScore,
+    metrics: initialEval.metrics,
+  });
+
   console.log(`[GEPA] Seed prompt score: ${bestScore.toFixed(2)}`);
 
   // Main GEPA loop
@@ -538,7 +621,11 @@ async function runGEPA(
     const batch: Sample[] = [];
     for (let i = 0; i < config.batchSize; i++) {
       const randomIndex = Math.floor(Math.random() * allSamples.length);
-      batch.push(allSamples[randomIndex]);
+      const sample = allSamples[randomIndex];
+      batch.push(sample);
+      if (!samplesUsed.includes(sample.id)) {
+        samplesUsed.push(sample.id);
+      }
     }
 
     console.log(
@@ -614,6 +701,15 @@ async function runGEPA(
         bestScore = improvedEval.overallScore;
       }
 
+      // Save accepted prompt to run
+      runPrompts.push({
+        iteration,
+        prompt: improvedPrompt,
+        accepted: true,
+        score: improvedEval.overallScore,
+        metrics: improvedEval.metrics,
+      });
+
       console.log(
         `[GEPA] ✓ Accepted! Collection size: ${
           collection.length
@@ -634,6 +730,15 @@ async function runGEPA(
         )} → ${improvedEval.overallScore.toFixed(2)}`,
       });
     } else {
+      // Save rejected prompt to run
+      runPrompts.push({
+        iteration,
+        prompt: improvedPrompt,
+        accepted: false,
+        score: improvedEval.overallScore,
+        metrics: improvedEval.metrics,
+      });
+
       console.log(
         `[GEPA] ✗ Rejected (no improvement: ${batchEval.overallScore.toFixed(
           2
@@ -650,6 +755,14 @@ async function runGEPA(
         message: `Iteration ${iteration}: No improvement`,
       });
     }
+
+    // Update and save run data periodically
+    run.prompts = runPrompts;
+    run.bestScore = bestScore;
+    run.samplesUsed = samplesUsed;
+    run.collectionSize = collection.length;
+    run.finalPrompt = selectPrompt(collection).prompt;
+    await saveRun(run);
   }
 
   // Final result
@@ -662,6 +775,15 @@ async function runGEPA(
     `[GEPA] Best prompt: "${bestCandidate.prompt.substring(0, 100)}..."`
   );
 
+  // Save final run data
+  run.status = "completed";
+  run.finalPrompt = bestCandidate.prompt;
+  run.bestScore = bestScore;
+  run.prompts = runPrompts;
+  run.samplesUsed = samplesUsed;
+  run.collectionSize = collection.length;
+  await saveRun(run);
+
   await sendProgress({
     type: "complete",
     iteration: config.numRollouts,
@@ -670,7 +792,9 @@ async function runGEPA(
     collectionSize: collection.length,
     collection,
     accepted: true,
-    message: `Optimization complete! Final score: ${bestScore.toFixed(2)}`,
+    message: `Optimization complete! Final score: ${bestScore.toFixed(
+      2
+    )} (Run ID: ${runId})`,
   });
 }
 
@@ -689,6 +813,21 @@ export async function POST(request: Request) {
         await runGEPA(config, sendProgress);
       } catch (error) {
         console.error("[GEPA] Fatal error:", error);
+
+        // Try to save error status to run
+        try {
+          const runsPath = path.join(process.cwd(), "data", "runs.json");
+          const data = await fs.readFile(runsPath, "utf-8");
+          const runsData = JSON.parse(data);
+          const lastRun = runsData.runs[runsData.runs.length - 1];
+          if (lastRun && lastRun.status === "running") {
+            lastRun.status = "error";
+            await fs.writeFile(runsPath, JSON.stringify(runsData, null, 2));
+          }
+        } catch {
+          // Ignore errors in error handling
+        }
+
         await sendProgress({
           type: "error",
           error:
