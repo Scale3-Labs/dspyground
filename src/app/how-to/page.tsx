@@ -239,6 +239,117 @@ export default function HowToPage() {
 
           <Separator />
 
+          {/* Data Files */}
+          <section>
+            <h3 className="text-xl font-semibold mb-4">📁 Data Files</h3>
+            <p className="text-muted-foreground mb-4">
+              DSPyground stores all your data in the{" "}
+              <code className="px-1.5 py-0.5 rounded bg-muted text-sm">
+                data/
+              </code>{" "}
+              directory. Here&apos;s what each file contains:
+            </p>
+            <div className="space-y-3">
+              <div className="border rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <code className="px-2 py-1 rounded bg-muted text-sm font-mono whitespace-nowrap">
+                    prompt.md
+                  </code>
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground">
+                      Your system prompt that guides the AI&apos;s behavior.
+                      Edit it using the prompt editor in the Chat page.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <code className="px-2 py-1 rounded bg-muted text-sm font-mono whitespace-nowrap">
+                    schema.json
+                  </code>
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground">
+                      JSON schema for structured output mode. Defines the format
+                      of AI responses when structured output is enabled.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <code className="px-2 py-1 rounded bg-muted text-sm font-mono whitespace-nowrap">
+                    samples.json
+                  </code>
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground">
+                      Stores all your sample groups and saved conversations used
+                      for testing and optimization.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <code className="px-2 py-1 rounded bg-muted text-sm font-mono whitespace-nowrap">
+                    runs.json
+                  </code>
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground">
+                      Contains the complete history of all optimization runs,
+                      including generated prompts, scores, and configurations.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <code className="px-2 py-1 rounded bg-muted text-sm font-mono whitespace-nowrap">
+                    preferences.json
+                  </code>
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground">
+                      Your app settings including selected models, batch size,
+                      number of iterations, and other optimization parameters.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <code className="px-2 py-1 rounded bg-muted text-sm font-mono whitespace-nowrap">
+                    metrics-prompt.json
+                  </code>
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground">
+                      Evaluation instructions and metric definitions (tone,
+                      accuracy, efficiency, etc.) used during optimization to
+                      score prompts.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-4 mt-4">
+              <p className="text-sm text-blue-900 dark:text-blue-100">
+                <strong>💡 Backup Tip:</strong> All your data is stored locally
+                in these JSON files. You can back them up by copying the{" "}
+                <code className="px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900">
+                  data/
+                </code>{" "}
+                directory, or version control them with git.
+              </p>
+            </div>
+          </section>
+
+          <Separator />
+
           {/* Tips */}
           <section>
             <h3 className="text-xl font-semibold mb-4">Pro Tips</h3>
