@@ -73,9 +73,11 @@ export async function initCommand() {
       await fs.access(configPath);
       console.log("⚠️  dspyground.config.ts already exists, skipping...");
     } catch {
-      // Find templates directory relative to CLI
+      // Find templates directory relative to CLI dist
+      // __dirname is dist/cli, so we need to go up to package root: ../../templates
       const templatePath = path.join(
         __dirname,
+        "..",
         "..",
         "templates",
         "dspyground.config.ts.template"
