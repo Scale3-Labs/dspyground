@@ -10,5 +10,5 @@
     "accuracy",
     "tool_accuracy"
   ],
-  "optimizeStructuredOutput": true
+  "optimizeStructuredOutput": false
 }
