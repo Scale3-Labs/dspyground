@@ -3,27 +3,8 @@
     {
       "id": "default",
       "name": "Default",
-      "samples": [
-        {
-          "id": "1760316711202-1990zq",
-          "timestamp": "2025-10-13T00:51:51.203Z",
-          "messages": [
-            {
-              "role": "user",
-              "content": "hi"
-            },
-            {
-              "role": "assistant",
-              "content": "Hello! How can I assist you today?"
-            }
-          ],
-          "feedback": {
-            "rating": "positive",
-            "comment": "good"
-          }
-        }
-      ],
-      "createdAt": "2025-10-13T00:49:49.926Z"
+      "samples": [],
+      "createdAt": "2025-10-13T00:55:01.971Z"
     }
   ],
   "currentGroupId": "default"
