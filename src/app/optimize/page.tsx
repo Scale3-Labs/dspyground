@@ -147,9 +147,7 @@ export default function OptimizePage() {
             setFinalPrompt(state.finalPrompt);
             setActiveTab("progress");
 
-            toast.info(
-              "Previous optimization is still running. It may have been interrupted."
-            );
+            toast.info("Previous optimization is still running.");
             return true;
           } else {
             // Run completed or errored, clear the state
@@ -736,8 +734,8 @@ export default function OptimizePage() {
                   <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
                     <Loader2 className="size-4" />
                     <p className="text-sm font-medium">
-                      An optimization run was in progress. View it in the
-                      Progress tab or clear it to start a new one.
+                      An optimization run is currently in progress. View it in
+                      the Progress tab or clear it to start a new one.
                     </p>
                   </div>
                   <Button
