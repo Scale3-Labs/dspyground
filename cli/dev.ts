@@ -63,41 +63,44 @@ export async function devCommand() {
     console.log(`⚙️  Config: ${configPath}`);
     console.log(`🌐 Server will start on: http://localhost:${port}\n`);
 
-    // Find the Next.js server directory
-    // In production, this should point to the bundled server
-    const serverDir = path.join(__dirname, "..", "src");
+    // Find the dspyground package root
+    // __dirname is dist/cli, so package root is ../..
+    const packageRoot = path.join(__dirname, "..", "..");
 
-    // Start Next.js dev server
-    const nextBin = path.join(cwd, "node_modules", ".bin", "next");
+    // Check if we're in development (has src/) or production (has .next/)
+    const hasSrc = await fs
+      .access(path.join(packageRoot, "src"))
+      .then(() => true)
+      .catch(() => false);
+    const hasNext = await fs
+      .access(path.join(packageRoot, ".next"))
+      .then(() => true)
+      .catch(() => false);
 
-    // Check if we're running from the package or local dev
     let command: string;
     let args: string[];
 
-    try {
-      // Try to find next in the dspyground package
-      const packageNextBin = path.join(
-        __dirname,
-        "..",
-        "node_modules",
-        ".bin",
-        "next"
-      );
-      await fs.access(packageNextBin);
-      command = packageNextBin;
-      args = ["dev", "-p", port.toString()];
-    } catch {
-      // Fall back to npx
+    if (hasSrc && !hasNext) {
+      // Development mode: run next dev from package root
+      console.log("🔧 Running in development mode\n");
       command = "npx";
       args = ["next", "dev", "-p", port.toString()];
+    } else if (hasNext) {
+      // Production mode: run next start (works with standalone)
+      console.log("🚀 Running in production mode\n");
+      command = "npx";
+      args = ["next", "start", "-p", port.toString()];
+    } else {
+      throw new Error("Could not find Next.js app in dspyground package");
     }
 
     const child = spawn(command, args, {
-      cwd: path.join(__dirname, ".."),
+      cwd: packageRoot,
       stdio: "inherit",
       env: {
         ...process.env,
-        NODE_ENV: "development",
+        NODE_ENV: hasNext && !hasSrc ? "production" : "development",
+        PORT: port.toString(),
       },
     });
 
