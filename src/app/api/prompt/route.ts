@@ -1,10 +1,11 @@
+import { getDataDirectory } from "@/lib/config-loader";
 import { promises as fs } from "fs";
 import path from "path";
 
 export const runtime = "nodejs";
 
 function getPromptPath() {
-  return path.join(process.cwd(), "data", "prompt.md");
+  return path.join(getDataDirectory(), "prompt.md");
 }
 
 async function ensureFile(): Promise<void> {

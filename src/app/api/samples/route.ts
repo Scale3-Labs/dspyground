@@ -1,3 +1,4 @@
+import { getDataDirectory } from "@/lib/config-loader";
 import type { UIMessage } from "ai";
 import { promises as fs } from "fs";
 import path from "path";
@@ -132,7 +133,7 @@ function transformMessages(messages: UIMessage[]) {
 }
 
 function getSamplesPath() {
-  return path.join(process.cwd(), "data", "samples.json");
+  return path.join(getDataDirectory(), "samples.json");
 }
 
 async function ensureFile(): Promise<void> {

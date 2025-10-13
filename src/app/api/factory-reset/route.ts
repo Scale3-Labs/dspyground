@@ -1,17 +1,25 @@
+import { getDataDirectory } from "@/lib/config-loader";
 import fs from "fs/promises";
 import { NextResponse } from "next/server";
 import path from "path";
 
-const RUNS_PATH = path.join(process.cwd(), "data", "runs.json");
-const SAMPLES_PATH = path.join(process.cwd(), "data", "samples.json");
-const PROMPT_PATH = path.join(process.cwd(), "data", "prompt.md");
-const SCHEMA_PATH = path.join(process.cwd(), "data", "schema.json");
+function getDataPaths() {
+  const dataDir = getDataDirectory();
+  return {
+    RUNS_PATH: path.join(dataDir, "runs.json"),
+    SAMPLES_PATH: path.join(dataDir, "samples.json"),
+    PROMPT_PATH: path.join(dataDir, "prompt.md"),
+    SCHEMA_PATH: path.join(dataDir, "schema.json"),
+  };
+}
 
 export async function POST() {
   try {
+    const paths = getDataPaths();
+
     // Clear runs
     await fs.writeFile(
-      RUNS_PATH,
+      paths.RUNS_PATH,
       JSON.stringify({ runs: [] }, null, 2),
       "utf-8"
     );
@@ -29,14 +37,14 @@ export async function POST() {
       currentGroupId: "default",
     };
     await fs.writeFile(
-      SAMPLES_PATH,
+      paths.SAMPLES_PATH,
       JSON.stringify(defaultSamples, null, 2),
       "utf-8"
     );
 
     // Reset prompt to default
     const defaultPrompt = "You are a helpful assistant.";
-    await fs.writeFile(PROMPT_PATH, defaultPrompt, "utf-8");
+    await fs.writeFile(paths.PROMPT_PATH, defaultPrompt, "utf-8");
 
     // Reset schema to simple example
     const defaultSchema = {
@@ -59,7 +67,7 @@ export async function POST() {
       additionalProperties: false,
     };
     await fs.writeFile(
-      SCHEMA_PATH,
+      paths.SCHEMA_PATH,
       JSON.stringify(defaultSchema, null, 2),
       "utf-8"
     );

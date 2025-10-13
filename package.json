@@ -1,16 +1,51 @@
 {
-  "name": "web",
+  "name": "dspyground",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
+  "description": "DSPyGround - Optimize and test your AI agents with AI SDK",
+  "author": "Karthik Kalyanaraman",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/dspyground.git"
+  },
+  "keywords": [
+    "ai",
+    "ai-sdk",
+    "dspy",
+    "prompt-optimization",
+    "llm",
+    "agent",
+    "testing"
+  ],
+  "bin": {
+    "dspyground": "./dist/cli/index.js"
+  },
+  "files": [
+    "dist",
+    "templates",
+    ".next",
+    "src",
+    "public",
+    "python_optimizer",
+    "next.config.ts",
+    "tsconfig.json",
+    "postcss.config.mjs",
+    "components.json"
+  ],
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "dev:cli": "tsx cli/index.ts",
+    "build": "npm run build:cli && npm run build:server",
+    "build:cli": "tsup cli/index.ts cli/init.ts cli/dev.ts --format esm --dts --out-dir dist/cli",
+    "build:server": "next build",
     "start": "next start",
     "lint": "eslint",
     "test:metrics": "npx tsx src/lib/test-metrics.ts",
     "dev:py": "cd python_optimizer && uv run app.py",
     "dev:all": "concurrently -k -n web,py -c auto \"npm run dev\" \"cd python_optimizer && uv run app.py\"",
-    "start:all": "concurrently -k -n web,py -c auto \"npm run dev\" \"cd python_optimizer && uv run app.py\""
+    "start:all": "concurrently -k -n web,py -c auto \"npm run dev\" \"cd python_optimizer && uv run app.py\"",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "@ai-sdk/gateway": "^1.0.25",
@@ -32,6 +67,7 @@
     "ai": "^5.0.44",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "commander": "^12.1.0",
     "convex": "^1.27.1",
     "dotenv": "^17.2.2",
     "lucide-react": "^0.544.0",
@@ -60,7 +96,11 @@
     "eslint": "^9",
     "eslint-config-next": "15.5.3",
     "tailwindcss": "^4",
+    "tsup": "^8.5.0",
     "tw-animate-css": "^1.3.8",
     "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

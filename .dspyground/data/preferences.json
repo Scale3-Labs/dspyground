@@ -1,0 +1,13 @@
+{
+  "selectedModel": "openai/gpt-4.1-mini",
+  "isTeachingMode": false,
+  "useStructuredOutput": false,
+  "optimizationModel": "openai/gpt-4.1-mini",
+  "reflectionModel": "openai/gpt-4.1",
+  "batchSize": 3,
+  "numRollouts": 10,
+  "selectedMetrics": [
+    "accuracy"
+  ],
+  "optimizeStructuredOutput": false
+}

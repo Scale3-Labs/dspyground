@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { getDataDirectory, loadUserConfig } from "@/lib/config-loader";
 import { generateObject, generateText, jsonSchema } from "ai";
 import { promises as fs } from "fs";
 import { nanoid } from "nanoid";
 import * as path from "path";
-import * as availableTools from "../../../../data/tools";
 import type { Trajectory } from "../../../lib/metrics";
 import { judgeAndScoreSample } from "../../../lib/metrics";
 import type {
@@ -26,9 +26,10 @@ interface OptimizeRequest {
   sampleGroupId?: string;
 }
 
-// Helper to load samples from data/samples.json
+// Helper to load samples from .dspyground/data/samples.json
 async function loadSamples(groupId?: string): Promise<Sample[]> {
-  const samplesPath = path.join(process.cwd(), "data", "samples.json");
+  const dataDir = getDataDirectory();
+  const samplesPath = path.join(dataDir, "samples.json");
   try {
     const data = await fs.readFile(samplesPath, "utf-8");
     const parsed = JSON.parse(data);
@@ -47,9 +48,10 @@ async function loadSamples(groupId?: string): Promise<Sample[]> {
   }
 }
 
-// Helper to load prompt from data/prompt.md
+// Helper to load prompt from .dspyground/data/prompt.md
 async function loadPrompt(): Promise<string> {
-  const promptPath = path.join(process.cwd(), "data", "prompt.md");
+  const dataDir = getDataDirectory();
+  const promptPath = path.join(dataDir, "prompt.md");
   try {
     const data = await fs.readFile(promptPath, "utf-8");
     return data.trim();
@@ -58,9 +60,10 @@ async function loadPrompt(): Promise<string> {
   }
 }
 
-// Helper to load schema from data/schema.json
+// Helper to load schema from .dspyground/data/schema.json
 async function loadSchema(): Promise<any> {
-  const schemaPath = path.join(process.cwd(), "data", "schema.json");
+  const dataDir = getDataDirectory();
+  const schemaPath = path.join(dataDir, "schema.json");
   try {
     const data = await fs.readFile(schemaPath, "utf-8");
     return JSON.parse(data);
@@ -142,11 +145,12 @@ async function generateTrajectoryForSample(
         });
       }
 
+      const config = await loadUserConfig();
       const result = await generateText({
         model,
         system: prompt,
         prompt: userInput,
-        tools: availableTools,
+        tools: config.tools || {},
       });
 
       // Send final text result
@@ -466,7 +470,8 @@ function selectPrompt(collection: PromptCandidate[]): PromptCandidate {
 // Save run data to runs.json
 async function saveRun(run: OptimizationRun): Promise<void> {
   try {
-    const runsPath = path.join(process.cwd(), "data", "runs.json");
+    const dataDir = getDataDirectory();
+    const runsPath = path.join(dataDir, "runs.json");
     let data: { runs: OptimizationRun[] } = { runs: [] };
 
     try {
@@ -816,7 +821,8 @@ export async function POST(request: Request) {
 
         // Try to save error status to run
         try {
-          const runsPath = path.join(process.cwd(), "data", "runs.json");
+          const dataDir = getDataDirectory();
+          const runsPath = path.join(dataDir, "runs.json");
           const data = await fs.readFile(runsPath, "utf-8");
           const runsData = JSON.parse(data);
           const lastRun = runsData.runs[runsData.runs.length - 1];

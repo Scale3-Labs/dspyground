@@ -1,0 +1,28 @@
+import { tool } from 'ai'
+import { z } from 'zod'
+
+export default {
+  // Import your AI SDK tools
+  // You can import tools from your existing codebase like this:
+  // import { myTool } from './src/lib/tools'
+  tools: {
+    // Example tool - replace with yours
+    exampleTool: tool({
+      description: 'Example tool that echoes back the query',
+      inputSchema: z.object({
+        query: z.string().describe('The query to process')
+      }),
+      execute: async ({ query }) => {
+        return `You asked: ${query}`
+      }
+    })
+  },
+
+  // System prompt for your agent
+  // This will be used as the default prompt, but can be edited in the UI
+  systemPrompt: `You are a helpful AI assistant.`,
+
+  // Default model (models list auto-fetched from AI Gateway)
+  defaultModel: 'openai/gpt-4o-mini'
+}
+

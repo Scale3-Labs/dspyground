@@ -1,3 +1,4 @@
+import { getDataDirectory, loadUserConfig } from "@/lib/config-loader";
 import {
   convertToModelMessages,
   jsonSchema,
@@ -8,7 +9,6 @@ import {
 import "dotenv/config";
 import fs from "fs/promises";
 import path from "path";
-import * as availableTools from "../../../../data/tools";
 
 export const maxDuration = 30;
 
@@ -23,14 +23,18 @@ export async function POST(req: Request) {
   console.log("📊 Structured output:", useStructuredOutput ? "ACTIVE" : "OFF");
   console.log("🤖 Model:", modelId);
 
-  // Read system prompt from data/prompt.md
+  // Load user config
+  const config = await loadUserConfig();
+
+  // Read system prompt from config or data/prompt.md
   let systemPrompt: string | undefined;
   try {
-    const promptPath = path.join(process.cwd(), "data", "prompt.md");
+    const dataDir = getDataDirectory();
+    const promptPath = path.join(dataDir, "prompt.md");
     const promptContent = await fs.readFile(promptPath, "utf8");
-    systemPrompt = promptContent?.trim() ? promptContent : undefined;
+    systemPrompt = promptContent?.trim() ? promptContent : config.systemPrompt;
   } catch {
-    systemPrompt = undefined;
+    systemPrompt = config.systemPrompt;
   }
 
   // If structured output is requested, use streamObject
@@ -38,19 +42,20 @@ export async function POST(req: Request) {
     // Get the prompt from the request body
     const prompt =
       typeof body === "string" ? body : body.prompt || body.input || "";
-    // Load schema from data/schema.json
+    // Load schema from .dspyground/data/schema.json
     let schema;
     try {
-      const schemaPath = path.join(process.cwd(), "data", "schema.json");
+      const dataDir = getDataDirectory();
+      const schemaPath = path.join(dataDir, "schema.json");
       const schemaContent = await fs.readFile(schemaPath, "utf8");
       schema = JSON.parse(schemaContent);
-      console.log("📋 Loaded schema from data/schema.json");
+      console.log("📋 Loaded schema from schema.json");
     } catch (error) {
       console.error("Failed to load schema:", error);
       return new Response(
         JSON.stringify({
           error:
-            "Schema not found. Please create a schema.json file in the data folder.",
+            "Schema not found. Please create a schema.json file in the .dspyground/data folder.",
         }),
         {
           status: 400,
@@ -89,7 +94,7 @@ export async function POST(req: Request) {
   const messages = body.messages || [];
   const result = streamText({
     model: modelId,
-    tools: availableTools,
+    tools: config.tools || {},
     system: systemPrompt,
     messages: convertToModelMessages(messages),
     stopWhen: stepCountIs(5),

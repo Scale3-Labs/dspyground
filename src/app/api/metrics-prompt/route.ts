@@ -1,17 +1,17 @@
+import { getDataDirectory } from "@/lib/config-loader";
 import fs from "fs/promises";
 import { NextResponse } from "next/server";
 import path from "path";
 
-const METRICS_PROMPT_FILE = path.join(
-  process.cwd(),
-  "data",
-  "metrics-prompt.json"
-);
+function getMetricsPromptFile() {
+  return path.join(getDataDirectory(), "metrics-prompt.json");
+}
 
 // GET: Read metrics prompts
 export async function GET() {
   try {
-    const data = await fs.readFile(METRICS_PROMPT_FILE, "utf-8");
+    const metricsPromptFile = getMetricsPromptFile();
+    const data = await fs.readFile(metricsPromptFile, "utf-8");
     const metricsPrompt = JSON.parse(data);
     return NextResponse.json(metricsPrompt);
   } catch (error) {
@@ -33,9 +33,10 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const metricsPrompt = await request.json();
+    const metricsPromptFile = getMetricsPromptFile();
 
     await fs.writeFile(
-      METRICS_PROMPT_FILE,
+      metricsPromptFile,
       JSON.stringify(metricsPrompt, null, 2),
       "utf-8"
     );

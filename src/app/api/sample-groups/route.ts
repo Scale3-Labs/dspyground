@@ -1,8 +1,11 @@
+import { getDataDirectory } from "@/lib/config-loader";
 import { promises as fs } from "fs";
 import { nanoid } from "nanoid";
 import * as path from "path";
 
-const SAMPLES_FILE = path.join(process.cwd(), "data", "samples.json");
+function getSamplesFile() {
+  return path.join(getDataDirectory(), "samples.json");
+}
 
 export interface SampleGroup {
   id: string;
@@ -18,7 +21,8 @@ export interface SamplesData {
 
 async function loadSamplesData(): Promise<SamplesData> {
   try {
-    const data = await fs.readFile(SAMPLES_FILE, "utf-8");
+    const samplesFile = getSamplesFile();
+    const data = await fs.readFile(samplesFile, "utf-8");
     return JSON.parse(data);
   } catch {
     return {
@@ -36,7 +40,8 @@ async function loadSamplesData(): Promise<SamplesData> {
 }
 
 async function saveSamplesData(data: SamplesData): Promise<void> {
-  await fs.writeFile(SAMPLES_FILE, JSON.stringify(data, null, 2));
+  const samplesFile = getSamplesFile();
+  await fs.writeFile(samplesFile, JSON.stringify(data, null, 2));
 }
 
 // GET /api/sample-groups - List all groups

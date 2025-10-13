@@ -1,8 +1,11 @@
+import { getDataDirectory } from "@/lib/config-loader";
 import fs from "fs/promises";
 import { NextResponse } from "next/server";
 import path from "path";
 
-const PREFERENCES_FILE = path.join(process.cwd(), "data", "preferences.json");
+function getPreferencesFile() {
+  return path.join(getDataDirectory(), "preferences.json");
+}
 
 type Preferences = {
   selectedModel: string;
@@ -33,15 +36,17 @@ const DEFAULT_PREFERENCES: Preferences = {
 // GET: Read preferences
 export async function GET() {
   try {
-    const data = await fs.readFile(PREFERENCES_FILE, "utf8");
+    const preferencesFile = getPreferencesFile();
+    const data = await fs.readFile(preferencesFile, "utf8");
     const preferences = JSON.parse(data) as Preferences;
     return NextResponse.json(preferences);
   } catch (error) {
     // If file doesn't exist or is invalid, return defaults and create the file
     console.error("Error reading preferences:", error);
     try {
+      const preferencesFile = getPreferencesFile();
       await fs.writeFile(
-        PREFERENCES_FILE,
+        preferencesFile,
         JSON.stringify(DEFAULT_PREFERENCES, null, 2),
         "utf8"
       );
@@ -70,8 +75,9 @@ export async function POST(request: Request) {
 
     // Read current preferences
     let currentPreferences: Preferences;
+    const preferencesFile = getPreferencesFile();
     try {
-      const data = await fs.readFile(PREFERENCES_FILE, "utf8");
+      const data = await fs.readFile(preferencesFile, "utf8");
       currentPreferences = JSON.parse(data) as Preferences;
     } catch {
       currentPreferences = DEFAULT_PREFERENCES;
@@ -85,7 +91,7 @@ export async function POST(request: Request) {
 
     // Write updated preferences
     await fs.writeFile(
-      PREFERENCES_FILE,
+      preferencesFile,
       JSON.stringify(updatedPreferences, null, 2),
       "utf8"
     );

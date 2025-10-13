@@ -1,7 +1,10 @@
+import { getDataDirectory } from "@/lib/config-loader";
 import { promises as fs } from "fs";
 import * as path from "path";
 
-const RUNS_FILE = path.join(process.cwd(), "data", "runs.json");
+function getRunsFile() {
+  return path.join(getDataDirectory(), "runs.json");
+}
 
 export interface RunPrompt {
   iteration: number;
@@ -33,7 +36,8 @@ export interface OptimizationRun {
 
 async function loadRuns(): Promise<{ runs: OptimizationRun[] }> {
   try {
-    const data = await fs.readFile(RUNS_FILE, "utf-8");
+    const runsFile = getRunsFile();
+    const data = await fs.readFile(runsFile, "utf-8");
     const parsed = JSON.parse(data);
     // Handle case where file contains just an array instead of { runs: [] }
     if (Array.isArray(parsed)) {
@@ -47,7 +51,8 @@ async function loadRuns(): Promise<{ runs: OptimizationRun[] }> {
 }
 
 async function saveRuns(data: { runs: OptimizationRun[] }): Promise<void> {
-  await fs.writeFile(RUNS_FILE, JSON.stringify(data, null, 2));
+  const runsFile = getRunsFile();
+  await fs.writeFile(runsFile, JSON.stringify(data, null, 2));
 }
 
 // GET /api/runs - List all runs
