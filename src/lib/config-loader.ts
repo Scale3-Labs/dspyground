@@ -61,10 +61,27 @@ export async function loadUserConfig(): Promise<DspygroundConfig> {
 }
 
 export function getDataDirectory(): string {
-  return (
-    process.env.DSPYGROUND_DATA_DIR ||
-    path.join(process.cwd(), ".dspyground", "data")
-  );
+  if (process.env.DSPYGROUND_DATA_DIR) {
+    return process.env.DSPYGROUND_DATA_DIR;
+  }
+
+  // Check for .dspyground/data (production/user mode)
+  const userDataDir = path.join(process.cwd(), ".dspyground", "data");
+
+  // Fallback to data/ for local development in the dspyground repo itself
+  const devDataDir = path.join(process.cwd(), "data");
+
+  // Use fs to check if directory exists
+  const fs = require("fs");
+  if (fs.existsSync(userDataDir)) {
+    return userDataDir;
+  } else if (fs.existsSync(devDataDir)) {
+    console.log("⚠️  Using legacy data/ directory for development");
+    return devDataDir;
+  }
+
+  // Default to .dspyground/data
+  return userDataDir;
 }
 
 // Clear cache (useful for testing or hot reload)
