@@ -766,7 +766,7 @@ export default function OptimizePage() {
                   <div className="space-y-2 mb-4">
                     <div className="flex items-center justify-between">
                       <label className="text-sm font-medium">
-                        System Prompt (from prompt.md)
+                        System Prompt (from config)
                       </label>
                       <Button
                         type="button"

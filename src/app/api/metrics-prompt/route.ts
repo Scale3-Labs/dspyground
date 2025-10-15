@@ -1,52 +1,38 @@
-import { getDataDirectory } from "@/lib/config-loader";
-import fs from "fs/promises";
+import { loadUserConfig } from "@/lib/config-loader";
 import { NextResponse } from "next/server";
-import path from "path";
 
-function getMetricsPromptFile() {
-  return path.join(getDataDirectory(), "metrics-prompt.json");
-}
+const DEFAULT_METRICS_PROMPT = {
+  evaluation_instructions:
+    "You are an expert AI evaluator. Evaluate the generated agent trajectory.",
+  dimensions: {},
+  positive_feedback_instruction: "",
+  negative_feedback_instruction: "",
+  comparison_positive: "",
+  comparison_negative: "",
+};
 
-// GET: Read metrics prompts
+// GET: Read metrics prompts from config (read-only)
 export async function GET() {
   try {
-    const metricsPromptFile = getMetricsPromptFile();
-    const data = await fs.readFile(metricsPromptFile, "utf-8");
-    const metricsPrompt = JSON.parse(data);
+    const config = await loadUserConfig();
+
+    // Return config metrics prompt or defaults
+    const metricsPrompt = config.metricsPrompt || DEFAULT_METRICS_PROMPT;
+
     return NextResponse.json(metricsPrompt);
   } catch (error) {
     console.error("Error reading metrics prompt:", error);
-    // Return default structure if file doesn't exist
-    return NextResponse.json({
-      evaluation_instructions:
-        "You are an expert AI evaluator. Evaluate the generated agent trajectory.",
-      dimensions: {},
-      positive_feedback_instruction: "",
-      negative_feedback_instruction: "",
-      comparison_positive: "",
-      comparison_negative: "",
-    });
+    return NextResponse.json(DEFAULT_METRICS_PROMPT);
   }
 }
 
-// POST: Write metrics prompts
-export async function POST(request: Request) {
-  try {
-    const metricsPrompt = await request.json();
-    const metricsPromptFile = getMetricsPromptFile();
-
-    await fs.writeFile(
-      metricsPromptFile,
-      JSON.stringify(metricsPrompt, null, 2),
-      "utf-8"
-    );
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Error writing metrics prompt:", error);
-    return NextResponse.json(
-      { error: "Failed to save metrics prompts" },
-      { status: 500 }
-    );
-  }
+// POST: Metrics prompt editing disabled
+export async function POST() {
+  return NextResponse.json(
+    {
+      error:
+        "Metrics prompt must be defined in dspyground.config.ts and cannot be edited through the UI.",
+    },
+    { status: 400 }
+  );
 }

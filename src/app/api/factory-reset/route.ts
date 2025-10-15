@@ -8,8 +8,6 @@ function getDataPaths() {
   return {
     RUNS_PATH: path.join(dataDir, "runs.json"),
     SAMPLES_PATH: path.join(dataDir, "samples.json"),
-    PROMPT_PATH: path.join(dataDir, "prompt.md"),
-    SCHEMA_PATH: path.join(dataDir, "schema.json"),
   };
 }
 
@@ -42,35 +40,8 @@ export async function POST() {
       "utf-8"
     );
 
-    // Reset prompt to default
-    const defaultPrompt = "You are a helpful assistant.";
-    await fs.writeFile(paths.PROMPT_PATH, defaultPrompt, "utf-8");
-
-    // Reset schema to simple example
-    const defaultSchema = {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "The name of the person",
-        },
-        age: {
-          type: "number",
-          description: "The age of the person",
-        },
-        email: {
-          type: "string",
-          description: "The email address",
-        },
-      },
-      required: ["name"],
-      additionalProperties: false,
-    };
-    await fs.writeFile(
-      paths.SCHEMA_PATH,
-      JSON.stringify(defaultSchema, null, 2),
-      "utf-8"
-    );
+    // Note: Prompt and schema are now defined in dspyground.config.ts
+    // and cannot be reset through the UI
 
     return NextResponse.json({ success: true });
   } catch (error) {

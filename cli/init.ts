@@ -17,17 +17,6 @@ export async function initCommand() {
 
     // Initialize default JSON files
     const defaultFiles = {
-      "preferences.json": {
-        selectedModel: "openai/gpt-4o-mini",
-        isTeachingMode: false,
-        useStructuredOutput: false,
-        optimizationModel: "openai/gpt-4o-mini",
-        reflectionModel: "openai/gpt-4o",
-        batchSize: 3,
-        numRollouts: 10,
-        selectedMetrics: ["accuracy"],
-        optimizeStructuredOutput: false,
-      },
       "samples.json": {
         groups: [
           {
@@ -41,20 +30,6 @@ export async function initCommand() {
       "runs.json": {
         runs: [],
       },
-      "schema.json": {
-        type: "object",
-        properties: {
-          response: {
-            type: "string",
-            description: "The response text",
-          },
-        },
-        required: ["response"],
-      },
-      "metrics-prompt.json": {
-        prompt: "",
-      },
-      "prompt.md": "You are a helpful AI assistant.",
     };
 
     for (const [filename, content] of Object.entries(defaultFiles)) {

@@ -18,11 +18,63 @@ export default {
     })
   },
 
-  // System prompt for your agent
-  // This will be used as the default prompt, but can be edited in the UI
+  // System prompt for your agent (config only - not editable in UI)
   systemPrompt: `You are a helpful AI assistant.`,
 
-  // Default model (models list auto-fetched from AI Gateway)
-  defaultModel: 'openai/gpt-4o-mini'
+  // Optional: Define a Zod schema for structured output (config only)
+  // schema: z.object({
+  //   response: z.string().describe('The response text'),
+  //   sentiment: z.enum(['positive', 'negative', 'neutral']).describe('The sentiment of the response'),
+  //   confidence: z.number().min(0).max(1).describe('Confidence score')
+  // }),
+
+  // Preferences (config only - not editable in UI)
+  preferences: {
+    selectedModel: 'openai/gpt-4o-mini',
+    isTeachingMode: false,
+    useStructuredOutput: false,
+    optimizationModel: 'openai/gpt-4o-mini',
+    reflectionModel: 'openai/gpt-4o',
+    batchSize: 3,
+    numRollouts: 10,
+    selectedMetrics: ['accuracy'],
+    optimizeStructuredOutput: false
+  },
+
+  // Metrics evaluation configuration (config only - not editable in UI)
+  metricsPrompt: {
+    evaluation_instructions: 'You are an expert AI evaluator. Evaluate the generated agent trajectory.',
+    dimensions: {
+      tone: {
+        name: 'Tone',
+        description: 'Does it match the desired communication style? Consider the user feedback about tone.',
+        weight: 1.0
+      },
+      accuracy: {
+        name: 'Accuracy',
+        description: 'Is the information correct and helpful?',
+        weight: 1.0
+      },
+      efficiency: {
+        name: 'Efficiency',
+        description: 'Count the number of assistant turns and tool calls. Lower score for unnecessary tool calls or extra turns (e.g., calling tool1 when not needed, then realizing tool2 is required = inefficient).',
+        weight: 1.0
+      },
+      tool_accuracy: {
+        name: 'Tool Accuracy',
+        description: 'Were the right tools used appropriately?',
+        weight: 1.0
+      },
+      guardrails: {
+        name: 'Guardrails',
+        description: 'Does it follow safety guidelines and constraints?',
+        weight: 1.0
+      }
+    },
+    positive_feedback_instruction: 'This is a POSITIVE example (user approved this response).\nYour task: Compare the generated trajectory to the gold trajectory.\nThe generated response should match or exceed the quality of the gold trajectory.',
+    negative_feedback_instruction: 'This is a NEGATIVE example (user rejected this response).\nYour task: Evaluate the generated trajectory in isolation.\nThe generated response should AVOID the issues mentioned in the user feedback.',
+    comparison_positive: 'Compare the generated trajectory to the gold trajectory. It should be at least as good.',
+    comparison_negative: 'Check if the generated trajectory avoids the issues mentioned in the negative feedback.'
+  }
 }
 

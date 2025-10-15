@@ -1,4 +1,5 @@
 import path from "path";
+import { z } from "zod";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ToolDefinition = any; // AI SDK tool type - using any to allow user's custom tools
@@ -6,7 +7,35 @@ type ToolDefinition = any; // AI SDK tool type - using any to allow user's custo
 export interface DspygroundConfig {
   tools?: Record<string, ToolDefinition>;
   systemPrompt?: string;
-  defaultModel?: string;
+  schema?: z.ZodType<any, any, any>; // Zod schema for structured output (config only)
+  // Preferences (config only)
+  preferences?: {
+    selectedModel?: string;
+    isTeachingMode?: boolean;
+    useStructuredOutput?: boolean;
+    optimizationModel?: string;
+    reflectionModel?: string;
+    batchSize?: number;
+    numRollouts?: number;
+    selectedMetrics?: string[];
+    optimizeStructuredOutput?: boolean;
+  };
+  // Metrics evaluation configuration (config only)
+  metricsPrompt?: {
+    evaluation_instructions?: string;
+    dimensions?: Record<
+      string,
+      {
+        name: string;
+        description: string;
+        weight: number;
+      }
+    >;
+    positive_feedback_instruction?: string;
+    negative_feedback_instruction?: string;
+    comparison_positive?: string;
+    comparison_negative?: string;
+  };
 }
 
 let cachedConfig: DspygroundConfig | null = null;
@@ -20,7 +49,6 @@ export async function loadUserConfig(): Promise<DspygroundConfig> {
   const defaultConfig: DspygroundConfig = {
     tools: {},
     systemPrompt: undefined,
-    defaultModel: "openai/gpt-4o-mini",
   };
 
   try {
@@ -71,7 +99,9 @@ export async function loadUserConfig(): Promise<DspygroundConfig> {
     cachedConfig = {
       tools: userConfig.tools || defaultConfig.tools,
       systemPrompt: userConfig.systemPrompt || defaultConfig.systemPrompt,
-      defaultModel: userConfig.defaultModel || defaultConfig.defaultModel,
+      schema: userConfig.schema,
+      preferences: userConfig.preferences,
+      metricsPrompt: userConfig.metricsPrompt,
     };
 
     return cachedConfig;

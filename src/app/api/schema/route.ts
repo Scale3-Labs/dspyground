@@ -1,19 +1,25 @@
-import { getDataDirectory } from "@/lib/config-loader";
-import fs from "fs/promises";
-import { NextRequest, NextResponse } from "next/server";
-import path from "path";
+import { loadUserConfig } from "@/lib/config-loader";
+import { NextResponse } from "next/server";
 
-function getSchemaPath() {
-  return path.join(getDataDirectory(), "schema.json");
-}
-
-// GET: Read the schema
+// GET: Schema info (read-only)
 export async function GET() {
   try {
-    const schemaPath = getSchemaPath();
-    const content = await fs.readFile(schemaPath, "utf-8");
-    const schema = JSON.parse(content);
-    return NextResponse.json(schema);
+    const config = await loadUserConfig();
+    if (config.schema) {
+      return NextResponse.json({
+        hasSchema: true,
+        message: "Schema is defined in dspyground.config.ts",
+      });
+    }
+
+    return NextResponse.json(
+      {
+        hasSchema: false,
+        error:
+          "No schema defined. Please define a Zod schema in dspyground.config.ts to use structured output.",
+      },
+      { status: 400 }
+    );
   } catch (error) {
     console.error("Error reading schema:", error);
     return NextResponse.json(
@@ -23,22 +29,13 @@ export async function GET() {
   }
 }
 
-// POST: Update the schema
-export async function POST(request: NextRequest) {
-  try {
-    const schema = await request.json();
-
-    // Validate that it's valid JSON (already done by request.json())
-    // Write the schema back to the file
-    const schemaPath = getSchemaPath();
-    await fs.writeFile(schemaPath, JSON.stringify(schema, null, 2), "utf-8");
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Error writing schema:", error);
-    return NextResponse.json(
-      { error: "Failed to write schema" },
-      { status: 500 }
-    );
-  }
+// POST: Schema editing disabled
+export async function POST() {
+  return NextResponse.json(
+    {
+      error:
+        "Schema must be defined as a Zod schema in dspyground.config.ts and cannot be edited through the UI.",
+    },
+    { status: 400 }
+  );
 }

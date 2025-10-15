@@ -1,14 +1,11 @@
-import { getDataDirectory, loadUserConfig } from "@/lib/config-loader";
+import { loadUserConfig } from "@/lib/config-loader";
 import {
   convertToModelMessages,
-  jsonSchema,
   stepCountIs,
   streamObject,
   streamText,
 } from "ai";
 import "dotenv/config";
-import fs from "fs/promises";
-import path from "path";
 
 export const maxDuration = 30;
 
@@ -26,15 +23,21 @@ export async function POST(req: Request) {
   // Load user config
   const config = await loadUserConfig();
 
-  // Read system prompt from config or data/prompt.md
-  let systemPrompt: string | undefined;
-  try {
-    const dataDir = getDataDirectory();
-    const promptPath = path.join(dataDir, "prompt.md");
-    const promptContent = await fs.readFile(promptPath, "utf8");
-    systemPrompt = promptContent?.trim() ? promptContent : config.systemPrompt;
-  } catch {
-    systemPrompt = config.systemPrompt;
+  // Get system prompt from config
+  const systemPrompt = config.systemPrompt;
+
+  // Validate schema is defined when structured output is enabled
+  if (useStructuredOutput && !config.schema) {
+    return new Response(
+      JSON.stringify({
+        error:
+          "Structured output is enabled but no schema is defined. Please define a Zod schema in dspyground.config.ts",
+      }),
+      {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   }
 
   // If structured output is requested, use streamObject
@@ -42,34 +45,17 @@ export async function POST(req: Request) {
     // Get the prompt from the request body
     const prompt =
       typeof body === "string" ? body : body.prompt || body.input || "";
-    // Load schema from .dspyground/data/schema.json
-    let schema;
-    try {
-      const dataDir = getDataDirectory();
-      const schemaPath = path.join(dataDir, "schema.json");
-      const schemaContent = await fs.readFile(schemaPath, "utf8");
-      schema = JSON.parse(schemaContent);
-      console.log("📋 Loaded schema from schema.json");
-    } catch (error) {
-      console.error("Failed to load schema:", error);
-      return new Response(
-        JSON.stringify({
-          error:
-            "Schema not found. Please create a schema.json file in the .dspyground/data folder.",
-        }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-    }
+
+    // Use schema from config (already validated above)
+    const schema = config.schema!; // Non-null assertion safe here due to validation above
+    console.log("📋 Using Zod schema from config");
 
     console.log("🚀 Starting streamObject...");
 
     try {
       const objectResult = streamObject({
         model: modelId,
-        schema: jsonSchema(schema),
+        schema: schema,
         system: systemPrompt,
         prompt: prompt,
       });

@@ -253,12 +253,13 @@ export default function HowToPage() {
               <div className="border rounded-lg p-4">
                 <div className="flex items-start gap-3">
                   <code className="px-2 py-1 rounded bg-muted text-sm font-mono whitespace-nowrap">
-                    prompt.md
+                    systemPrompt
                   </code>
                   <div className="flex-1">
                     <p className="text-sm text-muted-foreground">
-                      Your system prompt that guides the AI&apos;s behavior.
-                      Edit it using the prompt editor in the Chat page.
+                      Your system prompt defined in dspyground.config.ts that
+                      guides the AI&apos;s behavior. Can be overridden using the
+                      prompt editor in the Chat page.
                     </p>
                   </div>
                 </div>

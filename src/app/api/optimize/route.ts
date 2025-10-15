@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { getDataDirectory, loadUserConfig } from "@/lib/config-loader";
-import { generateObject, generateText, jsonSchema } from "ai";
+import { generateObject, generateText } from "ai";
 import { promises as fs } from "fs";
 import { nanoid } from "nanoid";
 import * as path from "path";
@@ -48,28 +48,16 @@ async function loadSamples(groupId?: string): Promise<Sample[]> {
   }
 }
 
-// Helper to load prompt from .dspyground/data/prompt.md
+// Helper to load prompt from config
 async function loadPrompt(): Promise<string> {
-  const dataDir = getDataDirectory();
-  const promptPath = path.join(dataDir, "prompt.md");
-  try {
-    const data = await fs.readFile(promptPath, "utf-8");
-    return data.trim();
-  } catch {
-    return "You are a helpful assistant.";
-  }
+  const config = await loadUserConfig();
+  return config.systemPrompt || "You are a helpful assistant.";
 }
 
-// Helper to load schema from .dspyground/data/schema.json
+// Helper to load schema from config (Zod schema)
 async function loadSchema(): Promise<any> {
-  const dataDir = getDataDirectory();
-  const schemaPath = path.join(dataDir, "schema.json");
-  try {
-    const data = await fs.readFile(schemaPath, "utf-8");
-    return JSON.parse(data);
-  } catch {
-    return null;
-  }
+  const config = await loadUserConfig();
+  return config.schema || null;
 }
 
 // Generate a trajectory for a sample using the current prompt
@@ -109,7 +97,7 @@ async function generateTrajectoryForSample(
         model,
         system: prompt,
         prompt: userInput,
-        schema: jsonSchema(schema),
+        schema: schema,
       });
 
       const outputStr = JSON.stringify(result.object, null, 2);
@@ -518,6 +506,20 @@ async function runGEPA(
       config.sampleGroupId || "default"
     }`
   );
+
+  // Validate schema is defined when structured output is enabled
+  if (config.useStructuredOutput && !schema) {
+    await sendProgress({
+      type: "error",
+      iteration: 0,
+      accepted: false,
+      collectionSize: 0,
+      bestScore: 0,
+      error:
+        "Structured output is enabled but no schema is defined. Please define a Zod schema in dspyground.config.ts",
+    });
+    return;
+  }
 
   if (allSamples.length === 0) {
     await sendProgress({
