@@ -41,7 +41,7 @@ The app will open at `http://localhost:3000`.
 
 ### Configuration
 
-Edit `dspyground.config.ts` to import your [AI SDK](https://ai-sdk.dev/) tools and customize your setup:
+Edit `dspyground.config.ts` to configure your agent environment. All configuration is centralized in this file:
 
 ```typescript
 import { tool } from 'ai'
@@ -50,19 +50,49 @@ import { z } from 'zod'
 import { myCustomTool } from './src/lib/tools'
 
 export default {
-  // Add your AI SDK tools
+  // Your AI SDK tools
   tools: {
     myCustomTool,
     // or define new ones inline
   },
 
-  // Set your system prompt
+  // System prompt for your agent
   systemPrompt: `You are a helpful assistant...`,
 
-  // Choose your default model
-  defaultModel: 'openai/gpt-4o-mini'
+  // Optional: Zod schema for structured output mode
+  schema: z.object({
+    response: z.string(),
+    sentiment: z.enum(['positive', 'negative', 'neutral'])
+  }),
+
+  // Preferences - optimization and chat settings
+  preferences: {
+    selectedModel: 'openai/gpt-4o-mini',      // Model for interactive chat
+    useStructuredOutput: false,               // Enable structured output in chat
+    optimizationModel: 'openai/gpt-4o-mini',  // Model to optimize prompts for
+    reflectionModel: 'openai/gpt-4o',         // Model for evaluation (judge)
+    batchSize: 3,                             // Samples per iteration
+    numRollouts: 10,                          // Number of optimization iterations
+    selectedMetrics: ['accuracy'],            // Metrics to optimize for
+    optimizeStructuredOutput: false           // Use structured output during optimization
+  },
+
+  // Metrics evaluation configuration
+  metricsPrompt: {
+    evaluation_instructions: 'You are an expert AI evaluator...',
+    dimensions: {
+      accuracy: {
+        name: 'Accuracy',
+        description: 'Is the information correct?',
+        weight: 1.0
+      },
+      // Add more dimensions...
+    }
+  }
 }
 ```
+
+**Configuration automatically reloads** when you modify the file—no server restart needed!
 
 ### Environment Setup
 
@@ -85,8 +115,8 @@ Install DSPyground in your repo and import your existing [AI SDK](https://ai-sdk
 
 ### 2. Chat and Sample Trajectories
 Interact with your agent and collect trajectory samples that demonstrate your desired behavior:
-- **Start with a base prompt** in `.dspyground/data/prompt.md` (editable in UI)
-- **Enable Teaching Mode** and chat with the AI to create scenarios
+- **Start with your system prompt** defined in `dspyground.config.ts`
+- **Chat with the AI** to create different scenarios and test your agent
 - **Save samples with feedback**: Click the + button to save conversation turns as test samples
   - Give **positive feedback** for good responses (these become reference examples)
   - Give **negative feedback** for bad responses (these guide what to avoid)
@@ -124,34 +154,57 @@ Our implementation extends the traditional GEPA (Genetic-Pareto Evolutionary Alg
 - Supports tool-calling agents with efficiency and tool accuracy metrics
 - Streams progress for real-time monitoring
 
-### 3. Configuration
-
-**Optimization Settings** (`.dspyground/data/preferences.json`):
-- `optimizationModel`: Model used for generating responses during optimization
-- `reflectionModel`: Model used for evaluation/judgment (should be more capable)
-- `batchSize`: Number of samples per iteration (default: 2)
-- `numRollouts`: Number of optimization iterations (default: 3)
-- `selectedMetrics`: Which dimensions to optimize for
-
-**Metrics Configuration** (`.dspyground/data/metrics-prompt.json`):
-- Customize evaluation instructions and dimension descriptions
-- Adjust weights and criteria for each metric
-- Define how positive vs negative feedback is interpreted
-
 ### 4. Results & History
-- **Optimized prompt** saved to `.dspyground/data/prompt.md`
 - **Run history** stored in `.dspyground/data/runs.json` with:
   - All candidate prompts (accepted and rejected)
   - Scores and metrics for each iteration
   - Sample IDs used during optimization
   - Pareto frontier evolution
 - **View in History tab**: See score progression and prompt evolution
+- **Copy optimized prompt** from history and update your `dspyground.config.ts`
+
+## Configuration Reference
+
+All configuration lives in `dspyground.config.ts`:
+
+### Core Settings
+
+- **`tools`**: Your AI SDK tools (imported from your codebase or defined inline)
+- **`systemPrompt`**: Base system prompt for your agent (defines agent behavior and personality)
+
+### Optional Settings
+
+- **`schema`**: Zod schema for structured output mode (enables JSON extraction, classification, etc.)
+
+### Preferences
+
+- **`selectedModel`**: Model used for interactive chat/testing in the UI
+- **`optimizationModel`**: Model to generate responses during optimization (the model you're optimizing for)
+- **`reflectionModel`**: Model for evaluation/judgment (typically more capable, acts as the "critic")
+- **`useStructuredOutput`**: Enable structured output in chat interface
+- **`optimizeStructuredOutput`**: Use structured output during optimization
+- **`batchSize`**: Number of samples per optimization iteration (default: 3)
+- **`numRollouts`**: Number of optimization iterations (default: 10)
+- **`selectedMetrics`**: Array of metrics to optimize for (e.g., `['accuracy', 'tone']`)
+
+### Metrics Configuration
+
+- **`evaluation_instructions`**: Base instructions for the evaluation LLM
+- **`dimensions`**: Define custom evaluation metrics with:
+  - `name`: Display name for the metric
+  - `description`: What this metric measures
+  - `weight`: Importance weight (default: 1.0)
+- **`positive_feedback_instruction`**: How to handle positive examples
+- **`negative_feedback_instruction`**: How to handle negative examples
+- **`comparison_positive`**: Comparison criteria for positive samples
+- **`comparison_negative`**: Comparison criteria for negative samples
 
 ## Additional Features
 
-- **Structured Output Mode** — Toggle between regular chat and structured output. Edit `.dspyground/data/schema.json` to define your output structure for data extraction, classification, and more.
-- **Custom Tools** — Import your tools in `dspyground.config.ts`. Works with any [AI SDK](https://ai-sdk.dev/) tool from your existing codebase.
-- **Sample Groups** — Organize samples by use case or test category. Switch groups during optimization to test different scenarios.
+- **Structured Output Mode** — Define Zod schemas in config for data extraction, classification, and structured responses
+- **Custom Tools** — Import any [AI SDK](https://ai-sdk.dev/) tool from your existing codebase
+- **Sample Groups** — Organize samples by use case or test category
+- **Hot Reload** — Config changes automatically reload without server restart
 
 ## Architecture
 
@@ -174,13 +227,14 @@ Our implementation extends the traditional GEPA (Genetic-Pareto Evolutionary Alg
 
 All data is stored locally in your project:
 
-- `.dspyground/data/prompt.md` — Current optimized prompt
-- `.dspyground/data/runs.json` — Full optimization history with all runs
-- `.dspyground/data/samples.json` — Collected samples organized by groups
-- `.dspyground/data/metrics-prompt.json` — Configurable evaluation criteria
-- `.dspyground/data/schema.json` — JSON schema for structured output mode
-- `.dspyground/data/preferences.json` — User preferences and optimization config
-- `dspyground.config.ts` — Tools, prompts, and model configuration
+**Configuration:**
+- `dspyground.config.ts` — All configuration: tools, prompts, schema, preferences, and metrics
+
+**Runtime Data:**
+- `.dspyground/data/runs.json` — Optimization history with all runs and scores
+- `.dspyground/data/samples.json` — Collected conversation samples organized by groups
+
+**Note:** Add `.dspyground/` to your `.gitignore` to keep runtime data local (automatically done during init).
 
 ## Learn More
 
