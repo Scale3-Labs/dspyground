@@ -1,8 +1,11 @@
+import { watch } from "fs";
 import path from "path";
 import { z } from "zod";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ToolDefinition = any; // AI SDK tool type - using any to allow user's custom tools
+
+let configWatcher: ReturnType<typeof watch> | null = null;
 
 export interface DspygroundConfig {
   tools?: Record<string, ToolDefinition>;
@@ -11,7 +14,6 @@ export interface DspygroundConfig {
   // Preferences (config only)
   preferences?: {
     selectedModel?: string;
-    isTeachingMode?: boolean;
     useStructuredOutput?: boolean;
     optimizationModel?: string;
     reflectionModel?: string;
@@ -104,6 +106,21 @@ export async function loadUserConfig(): Promise<DspygroundConfig> {
       metricsPrompt: userConfig.metricsPrompt,
     };
 
+    // Set up file watcher for hot reload (only once)
+    if (!configWatcher) {
+      try {
+        configWatcher = watch(configPath, (eventType) => {
+          if (eventType === "change") {
+            console.log("🔄 Config file changed, reloading...");
+            clearConfigCache();
+          }
+        });
+        console.log("👀 Watching config file for changes");
+      } catch (error) {
+        console.warn("⚠️  Could not set up config file watcher:", error);
+      }
+    }
+
     return cachedConfig;
   } catch (error) {
     console.warn(
@@ -142,4 +159,13 @@ export function getDataDirectory(): string {
 // Clear cache (useful for testing or hot reload)
 export function clearConfigCache() {
   cachedConfig = null;
+}
+
+// Stop watching config file (cleanup)
+export function stopConfigWatcher() {
+  if (configWatcher) {
+    configWatcher.close();
+    configWatcher = null;
+    console.log("🛑 Stopped watching config file");
+  }
 }

@@ -31,7 +31,6 @@ export default {
   // Preferences (config only - not editable in UI)
   preferences: {
     selectedModel: 'openai/gpt-4o-mini',
-    isTeachingMode: false,
     useStructuredOutput: false,
     optimizationModel: 'openai/gpt-4o-mini',
     reflectionModel: 'openai/gpt-4o',

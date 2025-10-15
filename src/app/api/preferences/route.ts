@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 
 type Preferences = {
   selectedModel: string;
-  isTeachingMode: boolean;
   useStructuredOutput: boolean;
   // Optimizer settings
   optimizationModel?: string;
@@ -16,7 +15,6 @@ type Preferences = {
 
 const DEFAULT_PREFERENCES: Preferences = {
   selectedModel: "openai/gpt-4.1-mini",
-  isTeachingMode: false,
   useStructuredOutput: false,
   // Optimizer defaults
   optimizationModel: "openai/gpt-4.1-mini",
