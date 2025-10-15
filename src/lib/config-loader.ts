@@ -48,9 +48,22 @@ export async function loadUserConfig(): Promise<DspygroundConfig> {
       interopDefault: true,
     });
 
-    // Load the config using jiti
-    const configModule = jiti(configPath);
-    const userConfig = configModule.default || configModule;
+    // Temporarily change working directory to the config file's directory
+    // This ensures process.cwd() in the config file points to the user's project
+    const originalCwd = process.cwd();
+    const configDir = path.dirname(configPath);
+
+    let userConfig;
+    try {
+      process.chdir(configDir);
+
+      // Load the config using jiti
+      const configModule = jiti(configPath);
+      userConfig = configModule.default || configModule;
+    } finally {
+      // Always restore the original working directory
+      process.chdir(originalCwd);
+    }
 
     console.log("✅ Loaded user config successfully");
 

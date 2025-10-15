@@ -111,8 +111,12 @@ export async function initCommand() {
 
     console.log("\n✨ DSPyGround initialized successfully!\n");
     console.log("Next steps:");
-    console.log("1. Edit dspyground.config.ts to add your tools and prompts");
-    console.log("2. Run: npx dspyground dev");
+    console.log("1. Set AI_GATEWAY_API_KEY environment variable");
+    console.log(
+      "   Get your API key: https://vercel.com/docs/ai-gateway/getting-started#set-up-your-api-key"
+    );
+    console.log("2. Edit dspyground.config.ts to add your tools and prompts");
+    console.log("3. Run: npx dspyground dev");
     console.log("\n");
   } catch (error) {
     console.error("❌ Error initializing DSPyGround:", error);
