@@ -62,21 +62,25 @@ export async function initCommand() {
       console.log("✅ Created dspyground.config.ts");
     }
 
-    // Copy .env template
+    // Create .env.example template
     const envPath = path.join(cwd, ".env.example");
     try {
       await fs.access(envPath);
       console.log("⚠️  .env.example already exists, skipping...");
     } catch {
-      const envTemplatePath = path.join(
-        __dirname,
-        "..",
-        "..",
-        "templates",
-        "env.template"
-      );
-      const envTemplateContent = await fs.readFile(envTemplatePath, "utf-8");
-      await fs.writeFile(envPath, envTemplateContent, "utf-8");
+      const envTemplate = `# AI Gateway API Key (Required)
+# Get your key from: https://vercel.com/docs/ai-gateway/getting-started
+AI_GATEWAY_API_KEY=your_api_key_here
+
+# Voice Feedback Feature (Optional)
+# Enable voice input in feedback dialog by pressing & holding space bar
+# OPENAI_API_KEY=your_openai_api_key_here
+
+# Custom OpenAI-compatible endpoint (Optional)
+# Only needed if using Azure OpenAI or other OpenAI-compatible service
+# OPENAI_BASE_URL=https://api.openai.com/v1
+`;
+      await fs.writeFile(envPath, envTemplate, "utf-8");
       console.log("✅ Created .env.example");
     }
 
