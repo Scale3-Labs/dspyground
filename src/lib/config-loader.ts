@@ -80,8 +80,10 @@ export async function loadUserConfig(): Promise<DspygroundConfig> {
     const { createJiti } = await import("jiti");
     // Use the config file's directory as the base path
     // This ensures dependencies are resolved from the user's project, not from the bundled package
+    // Always create a fresh jiti instance to avoid caching issues
     const jiti = createJiti(configPath, {
       interopDefault: true,
+      cache: false, // Disable jiti's internal cache for hot reload
     });
 
     // Temporarily change working directory to the config file's directory
