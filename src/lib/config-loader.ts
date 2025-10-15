@@ -42,7 +42,9 @@ export async function loadUserConfig(): Promise<DspygroundConfig> {
     // Use jiti to load TypeScript config
     // jiti can handle both .ts and .js files
     const { createJiti } = await import("jiti");
-    const jiti = createJiti(__filename, {
+    // Use the config file's directory as the base path
+    // This ensures dependencies are resolved from the user's project, not from the bundled package
+    const jiti = createJiti(configPath, {
       interopDefault: true,
     });
 
