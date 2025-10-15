@@ -74,6 +74,14 @@ export default {
     negative_feedback_instruction: 'This is a NEGATIVE example (user rejected this response).\nYour task: Evaluate the generated trajectory in isolation.\nThe generated response should AVOID the issues mentioned in the user feedback.',
     comparison_positive: 'Compare the generated trajectory to the gold trajectory. It should be at least as good.',
     comparison_negative: 'Check if the generated trajectory avoids the issues mentioned in the negative feedback.'
+  },
+
+  // Voice feedback configuration (optional - requires OPENAI_API_KEY)
+  // Enable voice input in feedback dialog by pressing and holding space bar
+  voiceFeedback: {
+    enabled: true,
+    transcriptionModel: 'whisper-1', // Only OpenAI Whisper is supported
+    extractionModel: 'openai/gpt-4o-mini' // Model to extract rating and feedback from transcript
   }
 }
 

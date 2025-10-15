@@ -62,6 +62,24 @@ export async function initCommand() {
       console.log("✅ Created dspyground.config.ts");
     }
 
+    // Copy .env template
+    const envPath = path.join(cwd, ".env.example");
+    try {
+      await fs.access(envPath);
+      console.log("⚠️  .env.example already exists, skipping...");
+    } catch {
+      const envTemplatePath = path.join(
+        __dirname,
+        "..",
+        "..",
+        "templates",
+        "env.template"
+      );
+      const envTemplateContent = await fs.readFile(envTemplatePath, "utf-8");
+      await fs.writeFile(envPath, envTemplateContent, "utf-8");
+      console.log("✅ Created .env.example");
+    }
+
     // Update .gitignore
     const gitignorePath = path.join(cwd, ".gitignore");
     try {
@@ -86,10 +104,12 @@ export async function initCommand() {
 
     console.log("\n✨ DSPyGround initialized successfully!\n");
     console.log("Next steps:");
-    console.log("1. Set AI_GATEWAY_API_KEY environment variable");
+    console.log("1. Copy .env.example to .env and add your API keys");
     console.log(
-      "   Get your API key: https://vercel.com/docs/ai-gateway/getting-started#set-up-your-api-key"
+      "   - AI_GATEWAY_API_KEY (required): https://vercel.com/docs/ai-gateway/getting-started"
     );
+    console.log("   - OPENAI_API_KEY (optional): For voice feedback feature");
+    console.log("   - OPENAI_BASE_URL (optional): For custom OpenAI endpoints");
     console.log("2. Edit dspyground.config.ts to add your tools and prompts");
     console.log("3. Run: npx dspyground dev");
     console.log("\n");

@@ -3,7 +3,88 @@
     {
       "id": "default",
       "name": "Default",
-      "samples": [],
+      "samples": [
+        {
+          "id": "1760569075698-kc7bpe",
+          "timestamp": "2025-10-15T22:57:55.698Z",
+          "messages": [
+            {
+              "role": "user",
+              "content": "hey"
+            },
+            {
+              "role": "assistant",
+              "content": "Hey! How can I assist you today?"
+            }
+          ],
+          "feedback": {
+            "rating": "negative",
+            "comment": "It needs to be more casual."
+          }
+        },
+        {
+          "id": "1760569103862-3ti7o0",
+          "timestamp": "2025-10-15T22:58:23.862Z",
+          "messages": [
+            {
+              "role": "user",
+              "content": "whats up"
+            },
+            {
+              "role": "assistant",
+              "content": "Not much! How about you? What’s on your mind today?"
+            }
+          ],
+          "feedback": {
+            "rating": "negative",
+            "comment": "The user is not providing feedback but indicating they will proceed to the next slide."
+          }
+        },
+        {
+          "id": "1760569221320-z7m24x",
+          "timestamp": "2025-10-15T23:00:21.320Z",
+          "messages": [
+            {
+              "role": "user",
+              "content": "whats up"
+            },
+            {
+              "role": "assistant",
+              "content": "Not much! How about you? What’s on your mind today?"
+            }
+          ],
+          "feedback": {
+            "rating": "negative",
+            "comment": "The user suggests that the AI conversation should include Gen Z-like slang, implying that the current conversation lacks it and could be improved by incorporating such language."
+          }
+        },
+        {
+          "id": "1760569244375-vt8euy",
+          "timestamp": "2025-10-15T23:00:44.375Z",
+          "messages": [
+            {
+              "role": "user",
+              "content": "whats up"
+            },
+            {
+              "role": "assistant",
+              "content": "Not much! How about you? What’s on your mind today?"
+            },
+            {
+              "role": "user",
+              "content": "whats going on?"
+            },
+            {
+              "role": "assistant",
+              "content": "Just here to help with whatever you need! What would you like to talk about?"
+            }
+          ],
+          "feedback": {
+            "rating": "negative",
+            "comment": "The game needs to be more casual and chintzy like Slank."
+          }
+        }
+      ],
       "createdAt": "2025-10-13T06:31:29.126Z"
     }
   ],

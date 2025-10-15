@@ -38,6 +38,12 @@ export interface DspygroundConfig {
     comparison_positive?: string;
     comparison_negative?: string;
   };
+  // Voice feedback configuration (optional - requires OPENAI_API_KEY)
+  voiceFeedback?: {
+    enabled?: boolean;
+    transcriptionModel?: string; // Only OpenAI Whisper is supported
+    extractionModel?: string; // Model to extract rating and feedback from transcript
+  };
 }
 
 let cachedConfig: DspygroundConfig | null = null;
@@ -104,6 +110,7 @@ export async function loadUserConfig(): Promise<DspygroundConfig> {
       schema: userConfig.schema,
       preferences: userConfig.preferences,
       metricsPrompt: userConfig.metricsPrompt,
+      voiceFeedback: userConfig.voiceFeedback,
     };
 
     // Set up file watcher for hot reload (only once)

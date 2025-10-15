@@ -100,9 +100,17 @@ Create a `.env` file in your project root:
 
 ```bash
 AI_GATEWAY_API_KEY=your_api_key_here
+
+# Optional: For voice feedback feature (press & hold space bar in feedback dialog)
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_BASE_URL=https://api.openai.com/v1  # Optional: Custom OpenAI-compatible endpoint
 ```
 
-This API key will be used by DSPyground to access AI models through [AI Gateway](https://vercel.com/docs/ai-gateway/getting-started). Follow the [getting started guide](https://vercel.com/docs/ai-gateway/getting-started) to create your API key.
+The `AI_GATEWAY_API_KEY` will be used by DSPyground to access AI models through [AI Gateway](https://vercel.com/docs/ai-gateway/getting-started). Follow the [getting started guide](https://vercel.com/docs/ai-gateway/getting-started) to create your API key.
+
+**Voice Feedback (Optional):**
+- `OPENAI_API_KEY`: Required for voice feedback feature. Allows you to record voice feedback in the evaluation dialog by pressing and holding the space bar. Uses OpenAI's Whisper for transcription.
+- `OPENAI_BASE_URL`: Optional. Set this if you want to use a custom OpenAI-compatible endpoint (e.g., Azure OpenAI). Defaults to `https://api.openai.com/v1`.
 
 **Note:** All data is stored locally in `.dspyground/data/` within your project. Add `.dspyground/` to your `.gitignore` (automatically done during init).
 
@@ -199,11 +207,20 @@ All configuration lives in `dspyground.config.ts`:
 - **`comparison_positive`**: Comparison criteria for positive samples
 - **`comparison_negative`**: Comparison criteria for negative samples
 
+### Voice Feedback Configuration (Optional)
+
+- **`voiceFeedback.enabled`**: Enable/disable voice feedback feature (default: `true`)
+- **`voiceFeedback.transcriptionModel`**: OpenAI Whisper model for transcription (default: `'whisper-1'` — only Whisper supported)
+- **`voiceFeedback.extractionModel`**: Model to extract rating and feedback from transcript (default: `'openai/gpt-4o-mini'`)
+
+**Note:** Voice feedback requires `OPENAI_API_KEY` in your `.env` file. Press and hold space bar in the feedback dialog to record voice feedback.
+
 ## Additional Features
 
 - **Structured Output Mode** — Define Zod schemas in config for data extraction, classification, and structured responses
 - **Custom Tools** — Import any [AI SDK](https://ai-sdk.dev/) tool from your existing codebase
 - **Sample Groups** — Organize samples by use case or test category
+- **Voice Feedback** — Record voice feedback by pressing and holding space bar in the feedback dialog (requires `OPENAI_API_KEY`)
 - **Hot Reload** — Config changes automatically reload without server restart
 
 ## Architecture
