@@ -121,6 +121,9 @@ export async function loadUserConfig(): Promise<DspygroundConfig> {
         configWatcher = watch(configPath, (eventType) => {
           if (eventType === "change") {
             console.log("🔄 Config file changed, reloading...");
+            console.log(
+              "💡 Refresh your browser to see UI changes, or continue using - new requests will use updated config"
+            );
             clearConfigCache();
           }
         });
