@@ -93,11 +93,23 @@ async function generateTrajectoryForSample(
         });
       }
 
-      // Use streamObject to see JSON being generated in real-time
+      // Use streamObject with messages array (like chat does)
+      // Convert message content to string format for streamObject
+      const messages: any[] = sample.messages.map((msg) => {
+        let content = msg.content;
+        if (typeof content !== "string") {
+          // Convert complex content to string
+          content = Array.isArray(content)
+            ? content.map((c) => c.text || JSON.stringify(c)).join(" ")
+            : JSON.stringify(content);
+        }
+        return { role: msg.role, content };
+      });
+
       const { partialObjectStream, object: finalObject } = streamObject({
         model,
         system: prompt,
-        prompt: userInput,
+        messages: messages as any,
         schema: schema,
       });
 
@@ -137,8 +149,9 @@ async function generateTrajectoryForSample(
         });
       }
 
+      // Include all sample messages + the generated JSON response
       predictedMessages = [
-        { role: "user", content: userInput },
+        ...sample.messages,
         { role: "assistant", content: outputStr },
       ];
     } else {
