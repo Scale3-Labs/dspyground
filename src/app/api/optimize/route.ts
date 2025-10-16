@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { getDataDirectory, loadUserConfig } from "@/lib/config-loader";
-import { generateText, streamObject } from "ai";
+import { generateObject, generateText } from "ai";
 import { promises as fs } from "fs";
 import { nanoid } from "nanoid";
 import * as path from "path";
@@ -93,8 +93,8 @@ async function generateTrajectoryForSample(
         });
       }
 
-      // Use streamObject with messages array (like chat does)
-      // Convert message content to string format for streamObject
+      // Use generateObject for structured output (non-streaming for optimizer)
+      // Convert message content to string format
       const messages: any[] = sample.messages.map((msg) => {
         let content = msg.content;
         if (typeof content !== "string") {
@@ -106,34 +106,13 @@ async function generateTrajectoryForSample(
         return { role: msg.role, content };
       });
 
-      const { partialObjectStream, object: finalObject } = streamObject({
+      const { object: result } = await generateObject({
         model,
         system: prompt,
         messages: messages as any,
         schema: schema,
       });
 
-      // Stream partial objects as they're generated
-      let lastPartialObject: any = null;
-      for await (const partialObject of partialObjectStream) {
-        lastPartialObject = partialObject;
-
-        // Send streaming updates to show JSON being built
-        if (sendProgress && iteration !== undefined) {
-          await sendProgress({
-            type: "sample_output_stream",
-            iteration,
-            sampleId: sample.id,
-            content: JSON.stringify(partialObject, null, 2),
-            accepted: false,
-            collectionSize: 0,
-            bestScore: 0,
-          });
-        }
-      }
-
-      // Wait for final object
-      const result = await finalObject;
       const outputStr = JSON.stringify(result, null, 2);
 
       // Send final result
