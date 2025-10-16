@@ -399,8 +399,8 @@ export default function Chat() {
       const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
       const modifierKey = isMac ? e.metaKey : e.ctrlKey;
 
-      // Cmd/Ctrl + A for sampling (add sample)
-      if (e.key === "a" && modifierKey) {
+      // Cmd/Ctrl + E for sampling (add sample)
+      if (e.key === "e" && modifierKey) {
         e.preventDefault();
         const canSample =
           (useStructuredOutput && object) ||

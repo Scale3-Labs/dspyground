@@ -406,7 +406,7 @@ export default function HowToPage() {
                   </p>
                 </div>
                 <kbd className="px-3 py-1.5 text-sm font-semibold text-foreground bg-muted border border-border rounded">
-                  ⌘ A
+                  ⌘ E
                 </kbd>
               </div>
               <div className="flex items-center justify-between border rounded-lg p-4">
