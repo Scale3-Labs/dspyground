@@ -52,12 +52,37 @@ export async function POST(req: Request) {
       `💬 Processing structured output with ${messages.length} messages`
     );
 
+    // Filter out any malformed messages and ensure content exists
+    const validMessages = messages
+      .filter((msg: any) => msg && msg.role && msg.content !== undefined)
+      .map((msg: any) => ({
+        role: msg.role,
+        content:
+          typeof msg.content === "string"
+            ? msg.content
+            : String(msg.content || ""),
+      }));
+
+    if (validMessages.length === 0) {
+      return new Response(
+        JSON.stringify({
+          error: "No valid messages provided",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    console.log(`✅ ${validMessages.length} valid messages prepared`);
+
     try {
       const objectResult = streamObject({
         model: modelId,
         schema: schema,
         system: systemPrompt,
-        messages: convertToModelMessages(messages),
+        messages: validMessages as any, // streamObject expects raw messages, not converted
       });
 
       return objectResult.toTextStreamResponse();
