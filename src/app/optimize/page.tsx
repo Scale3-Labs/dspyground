@@ -584,6 +584,48 @@ export default function OptimizePage() {
               ]);
             }
 
+            // Handle streaming JSON updates for structured output
+            if (
+              result.type === "sample_output_stream" &&
+              "sampleId" in result &&
+              "content" in result
+            ) {
+              setStreamLogs((prev) => {
+                // Find existing log entry for this sample
+                const sampleId = (result as any).sampleId;
+                const iteration = result.iteration;
+                const existingIndex = prev.findIndex(
+                  (log) =>
+                    log.type === "sample" &&
+                    log.sampleId === sampleId &&
+                    log.iteration === iteration
+                );
+
+                if (existingIndex !== -1) {
+                  // Update existing entry with streaming content
+                  const updated = [...prev];
+                  updated[existingIndex] = {
+                    ...updated[existingIndex],
+                    content: (result as any).content,
+                    timestamp: Date.now(),
+                  };
+                  return updated;
+                } else {
+                  // Create new entry if not found
+                  return [
+                    ...prev,
+                    {
+                      type: "sample",
+                      iteration: result.iteration,
+                      sampleId: (result as any).sampleId,
+                      content: (result as any).content,
+                      timestamp: Date.now(),
+                    },
+                  ];
+                }
+              });
+            }
+
             // Handle evaluation logs (added by API updates)
             if (result.type === "evaluation_output" && "content" in result) {
               setStreamLogs((prev) => [

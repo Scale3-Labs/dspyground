@@ -153,10 +153,24 @@ export default function Chat() {
     api: structuredApiUrl,
     schema: structuredOutputSchema,
     fetch: async (url, options) => {
-      // Custom fetch to send prompt in the correct format
+      // Custom fetch to send messages array just like regular chat
       const body = options?.body ? JSON.parse(options.body as string) : {};
+      const userMessage = body.prompt || body.input || "";
+
+      // Build messages array from current conversation + new message
+      const messagesArray = [
+        ...messages.map((msg: any) => ({
+          role: msg.role,
+          content: msg.content,
+        })),
+        {
+          role: "user",
+          content: userMessage,
+        },
+      ];
+
       const customBody = {
-        prompt: body.prompt || body.input || "",
+        messages: messagesArray,
       };
 
       return fetch(url, {

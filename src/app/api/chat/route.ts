@@ -42,22 +42,22 @@ export async function POST(req: Request) {
 
   // If structured output is requested, use streamObject
   if (useStructuredOutput) {
-    // Get the prompt from the request body
-    const prompt =
-      typeof body === "string" ? body : body.prompt || body.input || "";
-
     // Use schema from config (already validated above)
     const schema = config.schema!; // Non-null assertion safe here due to validation above
     console.log("📋 Using Zod schema from config");
 
-    console.log("🚀 Starting streamObject...");
+    // Get messages array - required for both structured and non-structured
+    const messages = body.messages || [];
+    console.log(
+      `💬 Processing structured output with ${messages.length} messages`
+    );
 
     try {
       const objectResult = streamObject({
         model: modelId,
         schema: schema,
         system: systemPrompt,
-        prompt: prompt,
+        messages: convertToModelMessages(messages),
       });
 
       return objectResult.toTextStreamResponse();

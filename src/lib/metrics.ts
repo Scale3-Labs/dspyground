@@ -1,7 +1,6 @@
 import { generateObject } from "ai";
-import fs from "fs/promises";
-import path from "path";
 import { z } from "zod";
+import { loadUserConfig } from "./config-loader";
 
 // Type definitions for trajectories/samples
 export interface Message {
@@ -100,54 +99,76 @@ async function loadMetricsPrompts(): Promise<{
   comparison_negative: string;
 }> {
   try {
-    const filePath = path.join(process.cwd(), "data", "metrics-prompt.json");
-    const data = await fs.readFile(filePath, "utf-8");
-    return JSON.parse(data);
+    // Load from config first
+    const config = await loadUserConfig();
+
+    if (config.metricsPrompt) {
+      // Use config values, fill in defaults for missing fields
+      return {
+        evaluation_instructions:
+          config.metricsPrompt.evaluation_instructions ||
+          "You are an expert AI evaluator. Evaluate the generated agent trajectory.",
+        dimensions: config.metricsPrompt.dimensions || {},
+        positive_feedback_instruction:
+          config.metricsPrompt.positive_feedback_instruction ||
+          "This is a POSITIVE example (user approved this response).\\nYour task: Compare the generated trajectory to the gold trajectory.\\nThe generated response should match or exceed the quality of the gold trajectory.",
+        negative_feedback_instruction:
+          config.metricsPrompt.negative_feedback_instruction ||
+          "This is a NEGATIVE example (user rejected this response).\\nYour task: Evaluate the generated trajectory in isolation.\\nThe generated response should AVOID the issues mentioned in the user feedback.",
+        comparison_positive:
+          config.metricsPrompt.comparison_positive ||
+          "Compare the generated trajectory to the gold trajectory. It should be at least as good.",
+        comparison_negative:
+          config.metricsPrompt.comparison_negative ||
+          "Check if the generated trajectory avoids the issues mentioned in the negative feedback.",
+      };
+    }
   } catch (error) {
-    console.error("[Metrics] Failed to load metrics prompts:", error);
-    // Return defaults if file doesn't exist
-    return {
-      evaluation_instructions:
-        "You are an expert AI evaluator. Evaluate the generated agent trajectory.",
-      dimensions: {
-        tone: {
-          name: "Tone",
-          description:
-            "Does it match the desired communication style? Consider the user feedback about tone.",
-          weight: 1.0,
-        },
-        accuracy: {
-          name: "Accuracy",
-          description: "Is the information correct and helpful?",
-          weight: 1.0,
-        },
-        efficiency: {
-          name: "Efficiency",
-          description:
-            "Count the number of assistant turns and tool calls. Lower score for unnecessary tool calls or extra turns.",
-          weight: 1.0,
-        },
-        tool_accuracy: {
-          name: "Tool Accuracy",
-          description: "Were the right tools used appropriately?",
-          weight: 1.0,
-        },
-        guardrails: {
-          name: "Guardrails",
-          description: "Does it follow safety guidelines and constraints?",
-          weight: 1.0,
-        },
-      },
-      positive_feedback_instruction:
-        "This is a POSITIVE example (user approved this response).\nYour task: Compare the generated trajectory to the gold trajectory.\nThe generated response should match or exceed the quality of the gold trajectory.",
-      negative_feedback_instruction:
-        "This is a NEGATIVE example (user rejected this response).\nYour task: Evaluate the generated trajectory in isolation.\nThe generated response should AVOID the issues mentioned in the user feedback.",
-      comparison_positive:
-        "Compare the generated trajectory to the gold trajectory. It should be at least as good.",
-      comparison_negative:
-        "Check if the generated trajectory avoids the issues mentioned in the negative feedback.",
-    };
+    console.error("[Metrics] Failed to load metrics from config:", error);
   }
+
+  // Return defaults if config doesn't have metrics prompt
+  return {
+    evaluation_instructions:
+      "You are an expert AI evaluator. Evaluate the generated agent trajectory.",
+    dimensions: {
+      tone: {
+        name: "Tone",
+        description:
+          "Does it match the desired communication style? Consider the user feedback about tone.",
+        weight: 1.0,
+      },
+      accuracy: {
+        name: "Accuracy",
+        description: "Is the information correct and helpful?",
+        weight: 1.0,
+      },
+      efficiency: {
+        name: "Efficiency",
+        description:
+          "Count the number of assistant turns and tool calls. Lower score for unnecessary tool calls or extra turns.",
+        weight: 1.0,
+      },
+      tool_accuracy: {
+        name: "Tool Accuracy",
+        description: "Were the right tools used appropriately?",
+        weight: 1.0,
+      },
+      guardrails: {
+        name: "Guardrails",
+        description: "Does it follow safety guidelines and constraints?",
+        weight: 1.0,
+      },
+    },
+    positive_feedback_instruction:
+      "This is a POSITIVE example (user approved this response).\\nYour task: Compare the generated trajectory to the gold trajectory.\\nThe generated response should match or exceed the quality of the gold trajectory.",
+    negative_feedback_instruction:
+      "This is a NEGATIVE example (user rejected this response).\\nYour task: Evaluate the generated trajectory in isolation.\\nThe generated response should AVOID the issues mentioned in the user feedback.",
+    comparison_positive:
+      "Compare the generated trajectory to the gold trajectory. It should be at least as good.",
+    comparison_negative:
+      "Check if the generated trajectory avoids the issues mentioned in the negative feedback.",
+  };
 }
 
 /**

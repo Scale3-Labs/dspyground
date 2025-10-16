@@ -69,6 +69,7 @@ export interface IterationResult {
     | "complete"
     | "error"
     | "sample_output"
+    | "sample_output_stream"
     | "evaluation_output"
     | "start";
   iteration: number;
